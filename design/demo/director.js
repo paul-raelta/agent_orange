@@ -20,9 +20,9 @@
   const lerp = (a, b, f) => a + (b - a) * f;
   function easeInOut(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
   let lastZoom = 1.04;
-  // Vertical centering target for the camera. Below frame-center (540) so the app
-  // sits a touch higher, reserving a clear band at the bottom for captions.
-  const CY = 466;
+  // Camera vertical centering target (frame is 1080 tall). Centered now that
+  // captions are placed dynamically and read cleanly over UI via their pill.
+  const CY = 532;
 
   function appPoint(target) {
     if (Array.isArray(target)) return { x: target[0], y: target[1] };
@@ -74,9 +74,9 @@
       cam: [{ t: 0, focus: '[data-card="NVDA"]', zoom: 1.22 }, { t: 2.2, focus: '[data-card="NVDA"]', zoom: 1.24 }, { t: 2.6, focus: '[data-card="SNDK"]', zoom: 1.24 }, { t: 4.6, focus: '[data-card="SNDK"]', zoom: 1.24 }, { t: 5, focus: '[data-card="MU"]', zoom: 1.24 }, { t: 7, focus: '[data-card="MU"]', zoom: 1.24 }],
       cursor: [{ t: 0, at: '[data-card="NVDA"]' }, { t: 2.6, at: '[data-card="SNDK"]' }, { t: 5, at: '[data-card="MU"]' }],
       captions: [
-        { t: 0, kicker: "NVDA", line: "NVIDIA just reported — <b>already validated.</b>" },
-        { t: 2.6, kicker: "SNDK", line: "SanDisk found something that <b>needs my call.</b>" },
-        { t: 5, kicker: "MU", line: "Micron — no date yet. <b>Still watching.</b>" },
+        { t: 0, pos: "tl", kicker: "NVDA", line: "NVIDIA just reported — <b>already validated.</b>" },
+        { t: 2.6, pos: "tc", kicker: "SNDK", line: "SanDisk found something that <b>needs my call.</b>" },
+        { t: 5, pos: "tr", kicker: "MU", line: "Micron — no date yet. <b>Still watching.</b>" },
       ],
     },
     // 3 — PORTFOLIO
@@ -93,8 +93,8 @@
       cursor: [{ t: 0, at: [720, 250] }, { t: 1.8, at: "[data-run]" }, { t: 6.5, at: "[data-run]" }],
       clicks: [{ t: 2.2, at: "[data-run]" }],
       captions: [
-        { t: 0, kicker: "One click", line: "Then I set them loose — <b>offline, unsupervised.</b>" },
-        { t: 3, kicker: "Running", line: "Each agent goes and finds its company's latest filing." },
+        { t: 0, pos: "bl", kicker: "One click", line: "Then I set them loose — <b>offline, unsupervised.</b>" },
+        { t: 3, pos: "bl", kicker: "Running", line: "Each agent goes and finds its company's latest filing." },
       ],
     },
     // 5 — NOTIFICATIONS (laptop email + phone SMS)
@@ -105,7 +105,7 @@
       cursor: [{ t: 0, at: [720, 470] }, { t: 1.8, at: ".mail-row.unread" }, { t: 4.5, at: ".mail-list" }, { t: 6.8, at: ".phone" }],
       captions: [
         { t: 0, kicker: "Notifications", line: "I don't sit and watch — <b>it reaches me.</b>" },
-        { t: 6.6, kicker: "Email + SMS", line: "A mail and a text the moment results land — or need me." },
+        { t: 6.6, pos: "bl", kicker: "Email + SMS", line: "A mail and a text the moment results land — or need me." },
       ],
     },
     // 6 — NVDA NARRATIVE
@@ -129,7 +129,7 @@
       cam: [{ t: 0, focus: EPS, zoom: 1.24 }, { t: 1, focus: EPS, zoom: 1.24 }, { t: 2, focus: ".drawer", zoom: 1.12 }, { t: 10, focus: ".drawer", zoom: 1.1 }],
       cursor: [{ t: 0, at: EPS }, { t: 1.2, at: EPS }, { t: 2.4, at: ".drawer .prov-quote" }, { t: 9, at: ".drawer .prov-quote" }],
       clicks: [{ t: 0.85, at: EPS }],
-      captions: [{ t: 0, kicker: "Provenance", line: "EPS <b>$2.39</b> — traced to three independent sources, down to the page." }],
+      captions: [{ t: 0, pos: "bl", kicker: "Provenance", line: "EPS <b>$2.39</b> — traced to three independent sources, down to the page." }],
     },
     // 9 — REVIEW QUEUE
     {
@@ -138,7 +138,7 @@
       cursor: [{ t: 0, at: [400, 300] }, { t: 2, at: ".rv-cand:nth-child(1)" }, { t: 4, at: ".rv-cand:nth-child(2)" }, { t: 6, at: '[data-use="$0.82"]' }, { t: 7, at: '[data-use="$0.82"]' }],
       clicks: [{ t: 6.6, at: '[data-use="$0.82"]' }],
       captions: [
-        { t: 0, kicker: "Review queue", line: "SanDisk disagrees with itself: headline <b>$0.82</b> vs schedule <b>$0.79</b>." },
+        { t: 0, pos: "tc", kicker: "Review queue", line: "SanDisk disagrees with itself: headline <b>$0.82</b> vs schedule <b>$0.79</b>." },
         { t: 7.4, kicker: "Human-in-the-loop", line: "So I make the call. <b>Agents never guess.</b>" },
       ],
     },
@@ -162,13 +162,13 @@
     // 12 — OUTRO
     {
       start: 88, screen: "watchlist", params: {},
-      title: { mode: "outro", html: `<div class="t-wrap"><div class="t-mark"></div><div class="t-word">AGENT&nbsp;<b>ORANGE</b></div><div class="t-tag">Fetches. Validates. Flags what needs you.<br>Your earnings desk, on autopilot.</div></div>` },
-      cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 6, focus: "full", zoom: 1.02 }],
+      title: { mode: "outro", html: `<div class="t-wrap"><div class="t-mark"></div><div class="t-word">AGENT&nbsp;<b>ORANGE</b></div><div class="t-tag">Fetches. Validates. Flags what needs you.<br>Your earnings desk, on autopilot.</div><div class="t-live"><span class="t-stage t-l1">This isn't just a mockup…</span> <span class="t-stage t-l2">…it's working right now.</span></div><div class="t-stage t-contact">Contact <a href="mailto:paul.mcevoy@raelta.com">paul.mcevoy@raelta.com</a> for access.</div></div>` },
+      cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 12, focus: "full", zoom: 1.02 }],
       cursor: [{ t: 0, at: [760, 470] }],
       captions: [],
     },
   ];
-  const DUR = 94;
+  const DUR = 100;
   SCENES.forEach((s, i) => { s.end = i < SCENES.length - 1 ? SCENES[i + 1].start : DUR; });
 
   // ---------- render state ----------
@@ -192,20 +192,34 @@
       op = lt < 0.8 ? lt / 0.8 : 1;
     }
     titleEl.style.opacity = op;
+    if (scene.title.mode === "outro") {
+      // staged deterministic fade-ins (scrub-safe) — slow, for suspense
+      const set = (sel, start, dur) => { const el = titleEl.querySelector(sel); if (el) el.style.opacity = Math.max(0, Math.min(1, (lt - start) / dur)).toFixed(3); };
+      set(".t-l1", 2.0, 1.6);
+      set(".t-l2", 4.6, 1.6);
+      set(".t-contact", 7.2, 1.2);
+    }
   }
 
   function applyCaption(scene, lt) {
     const caps = scene.captions || [];
-    let active = null;
-    for (const c of caps) if (lt >= c.t) active = c;
-    const key = active ? scene.start + "_" + active.t : "";
+    let idx = -1;
+    for (let i = 0; i < caps.length; i++) if (lt >= caps[i].t) idx = i;
+    if (idx < 0) { capEl.style.opacity = 0; return; }
+    const active = caps[idx];
+    const next = caps[idx + 1];
+    const localEnd = next ? next.t : (scene.end - scene.start);
+    // deterministic fade envelope (scrub-safe): in 0.45s, out 0.35s
+    const op = Math.max(0, Math.min(1, Math.min((lt - active.t) / 0.45, (localEnd - lt) / 0.35, 1)));
+    const key = scene.start + "_" + active.t;
     if (key !== lastCapKey) {
       lastCapKey = key;
-      if (active) {
-        capEl.innerHTML = `<div class="cap-inner"><span class="cap-kicker">${active.kicker}</span><div class="cap-line">${active.line}</div></div>`;
-        capEl.classList.remove("show"); void capEl.offsetWidth; capEl.classList.add("show");
-      } else capEl.classList.remove("show");
+      capEl.innerHTML = `<div class="cap-inner"><span class="cap-kicker">${active.kicker}</span><div class="cap-line">${active.line}</div></div>`;
+      capEl.className = "pos-" + (active.pos || "bc");
     }
+    capEl.style.opacity = op.toFixed(3);
+    const inner = capEl.firstChild;
+    if (inner) inner.style.transform = `translateY(${((1 - op) * 12).toFixed(1)}px)`;
   }
 
   function applyClicks(scene, lt) {
