@@ -11,6 +11,8 @@ import {
   useSaveNotificationPrefs,
   useUsage,
 } from '../hooks'
+import { useShell } from '../layout/shellContext'
+import type { RunFeedback } from '../layout/shellContext'
 import type { NotificationPrefs } from '../types'
 
 const MODELS = ['Claude Haiku 4', 'Claude Sonnet 4', 'Claude Opus 4']
@@ -22,6 +24,7 @@ export function Settings() {
   const putRouting = usePutRouting()
   const { data: prefs } = useNotificationPrefs()
   const savePrefs = useSaveNotificationPrefs()
+  const { runFeedback, setRunFeedback } = useShell()
 
   // Local edit state for the notifications form — committed on Save.
   const [draft, setDraft] = useState<NotificationPrefs | null>(null)
@@ -220,6 +223,36 @@ export function Settings() {
           {savePrefs.isSuccess && (
             <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ Saved</span>
           )}
+        </div>
+      </Panel>
+
+      <Panel
+        title="RUN-ALL FEEDBACK"
+        right={<span className="hint">how the UI tells you the pipeline was kicked</span>}
+      >
+        <div className="route-row">
+          <div className="route-task">
+            <b>Visible response on RUN ALL AGENTS</b>
+            <span>
+              The API returns instantly (the pipeline runs in the background), so without
+              extra UI the click can look like it did nothing.
+            </span>
+          </div>
+          <div className="seg seg-model">
+            {([
+              { value: 'toast', label: 'TOAST' },
+              { value: 'button', label: 'HELD BUTTON' },
+              { value: 'both', label: 'BOTH' },
+            ] as { value: RunFeedback; label: string }[]).map((opt) => (
+              <button
+                key={opt.value}
+                className={runFeedback === opt.value ? 'active' : ''}
+                onClick={() => setRunFeedback(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </Panel>
 

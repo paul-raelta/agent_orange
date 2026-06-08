@@ -2110,6 +2110,49 @@ select.inp {
   margin-top: 14px;
 }
 
+/* ===== Toast (RUN ALL AGENTS feedback) ===== */
+@keyframes ao-toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.ao-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483645;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--accent-line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+  padding: 11px 14px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  max-width: 360px;
+  animation: ao-toast-in 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ao-toast-x {
+  font-size: 12px;
+  color: var(--text-3);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.ao-toast-x:hover {
+  color: var(--text);
+  background: var(--panel);
+}
+
 /* ===== Tweaks toggle button (in-app theme switcher per §11) ===== */
 .tweaks-fab {
   position: fixed;

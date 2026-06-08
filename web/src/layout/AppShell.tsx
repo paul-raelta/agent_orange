@@ -1,12 +1,16 @@
 /* Agent Orange — app shell: sidebar nav + usage meter + routed content (§5).
    Replaces the prototype's state-based router with React Router; the desktop/
    mobile toggle is dropped (prototype-only) — the layout is just responsive via
-   the 700px container query on .app-shell. */
-import { useState } from 'react'
+   the 700px container query on .app-shell.
+
+   Also owns: the RUN ALL AGENTS feedback affordance (toast / held button /
+   both), with the choice persisted in localStorage and exposed through the
+   shell context so the Settings screen can change it. */
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useReviewQueue, useRunAll, useUsage } from '../hooks'
 import { TweaksPanel } from '../theme/TweaksPanel'
-import type { ShellContext } from './shellContext'
+import type { RunFeedback, ShellContext } from './shellContext'
 
 const NAV = [
   { to: '/', label: 'Watchlist', icon: '▦', end: true },
@@ -17,23 +21,74 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: '⚙' },
 ]
 
+const FEEDBACK_KEY = 'ao-run-feedback'
+const HOLD_DURATION_MS = 3000
+
+function loadFeedback(): RunFeedback {
+  try {
+    const v = localStorage.getItem(FEEDBACK_KEY)
+    if (v === 'toast' || v === 'button' || v === 'both') return v
+  } catch {
+    /* ignore */
+  }
+  return 'both'
+}
+
 export function AppShell() {
   const { data: reviewQueue } = useReviewQueue()
   const { data: usage } = useUsage()
   const runAllMutation = useRunAll()
 
   const [lastSync, setLastSync] = useState('Jul 30 · 09:12')
-  const running = runAllMutation.isPending
+  const [holdRunning, setHoldRunning] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [runFeedback, setRunFeedbackState] = useState<RunFeedback>(loadFeedback)
+
+  function setRunFeedback(v: RunFeedback) {
+    setRunFeedbackState(v)
+    try {
+      localStorage.setItem(FEEDBACK_KEY, v)
+    } catch {
+      /* ignore quota */
+    }
+  }
+
+  // Toast auto-dismisses after 4s.
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  // Held-button state clears after HOLD_DURATION_MS.
+  useEffect(() => {
+    if (!holdRunning) return
+    const t = setTimeout(() => setHoldRunning(false), HOLD_DURATION_MS)
+    return () => clearTimeout(t)
+  }, [holdRunning])
+
+  const running = runAllMutation.isPending || holdRunning
 
   function runAll() {
     if (running) return
     runAllMutation.mutate(undefined, {
-      onSuccess: (res) => setLastSync(res.lastSync),
+      onSuccess: (res) => {
+        setLastSync(res.lastSync)
+        if (runFeedback === 'toast' || runFeedback === 'both') {
+          setToast('Triggered. Check Activity for progress →')
+        }
+        if (runFeedback === 'button' || runFeedback === 'both') {
+          setHoldRunning(true)
+        }
+      },
+      onError: () => {
+        setToast('Run failed — is the API up? Check workers/ console.')
+      },
     })
   }
 
   const reviewCount = reviewQueue?.length ?? 0
-  const ctx: ShellContext = { running, lastSync, runAll }
+  const ctx: ShellContext = { running, lastSync, runAll, runFeedback, setRunFeedback }
 
   return (
     <div className="app-shell">
@@ -83,6 +138,19 @@ export function AppShell() {
       <main className="content">
         <Outlet context={ctx} />
       </main>
+
+      {toast && (
+        <div className="ao-toast" role="status">
+          {toast}
+          <button
+            className="ao-toast-x"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <TweaksPanel />
     </div>
