@@ -3,12 +3,19 @@
 import { useNavigate } from 'react-router-dom'
 import { Btn, Conf, Delta, Glyph, Price, Spark, StatusChip } from '../components/primitives'
 import { Loading } from '../components/Loading'
-import { useCompanies } from '../hooks'
+import { useCompanies, usePortfolioTotals } from '../hooks'
 import { useShell } from '../layout/shellContext'
 import type { Company } from '../types'
 
+function fmtMoney(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(2)}k`
+  return `$${n.toFixed(2)}`
+}
+
 export function Watchlist() {
   const { data: companies } = useCompanies()
+  const { data: totals } = usePortfolioTotals()
   const { lastSync, running, runAll } = useShell()
   const navigate = useNavigate()
 
@@ -38,6 +45,34 @@ export function Watchlist() {
           </Btn>
         </div>
       </div>
+
+      {totals && (
+        <div className="pf-strip">
+          <div className="pf-cell">
+            <span className="lbl">PORTFOLIO</span>
+            <span className="pf-val">{fmtMoney(totals.totalValue)}</span>
+          </div>
+          <div className="pf-cell">
+            <span className="lbl">COST</span>
+            <span className="pf-val pf-val-dim">{fmtMoney(totals.totalCost)}</span>
+          </div>
+          <div className="pf-cell">
+            <span className="lbl">UNREALIZED</span>
+            <span
+              className={
+                'pf-val ' + (totals.unrealized >= 0 ? 'delta-up' : 'delta-down')
+              }
+            >
+              {totals.unrealized >= 0 ? '▲' : '▼'} {fmtMoney(Math.abs(totals.unrealized))}
+              <span className="pf-pct">
+                {' '}
+                {totals.unrealized >= 0 ? '+' : '−'}
+                {Math.abs(totals.unrealizedPct).toFixed(1)}%
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="wl-grid">
         {companies.map((c) => (
@@ -80,6 +115,22 @@ function CompanyCard({
         <Price price={c.price} change={c.dayChange} />
         <Spark data={c.sparkEps} color="var(--accent)" />
       </div>
+
+      {c.portfolio.shares > 0 && (
+        <div className="wl-position">
+          <span className="lbl">POSITION</span>
+          <span className="wl-position-val">{fmtMoney(c.portfolio.value)}</span>
+          <span
+            className={
+              'wl-position-pl ' +
+              (c.portfolio.unrealized >= 0 ? 'delta-up' : 'delta-down')
+            }
+          >
+            {c.portfolio.unrealized >= 0 ? '▲' : '▼'}{' '}
+            {Math.abs(c.portfolio.unrealizedPct).toFixed(1)}%
+          </span>
+        </div>
+      )}
 
       <div className="wl-period">
         <span className="wl-period-lab">

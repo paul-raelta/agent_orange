@@ -1,6 +1,7 @@
 /* Agent Orange — Company deep-dive (company/:ticker, §5.2). Full history +
-   validation + provenance for one company. */
-import { useState } from 'react'
+   validation + provenance for one company, plus AI narrative, portfolio editor,
+   News + Insider tabs, and PLANNED tiles for future features. */
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Btn,
@@ -15,10 +16,16 @@ import {
 } from '../components/primitives'
 import { LogList } from '../components/LogList'
 import { Loading } from '../components/Loading'
-import { useActivity, useCompany } from '../hooks'
+import {
+  useActivity,
+  useCompany,
+  useInsider,
+  useNews,
+  useSetPosition,
+} from '../hooks'
 import type { HistoryRow, Metric } from '../types'
 
-const TABS = ['results', 'validation', 'agent runs'] as const
+const TABS = ['results', 'validation', 'news', 'insider', 'agent runs'] as const
 type Tab = (typeof TABS)[number]
 
 const ROWS: [string, keyof HistoryRow][] = [
@@ -29,13 +36,40 @@ const ROWS: [string, keyof HistoryRow][] = [
   ['Gross margin', 'gm'],
 ]
 
+const PLANNED_FEATURES = [
+  { name: 'Forward guidance', desc: "Next-quarter / full-year revenue + EPS guidance from the press release." },
+  { name: 'Segment breakdowns', desc: 'Revenue by segment, geography and product line.' },
+  { name: 'Earnings transcripts', desc: 'Pull the call, summarize Q&A themes.' },
+  { name: 'Consensus vs actual', desc: 'Beat / miss vs Wall Street estimates.' },
+]
+
+function fmtMoney(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(2)}k`
+  return `$${n.toFixed(2)}`
+}
+
 export function Company() {
   const { ticker = '' } = useParams()
   const navigate = useNavigate()
   const { data: c, isLoading } = useCompany(ticker)
   const { data: activity } = useActivity(ticker)
+  const { data: news } = useNews(ticker)
+  const { data: insider } = useInsider(ticker)
+  const setPosition = useSetPosition(ticker)
   const [tab, setTab] = useState<Tab>('results')
   const [prov, setProv] = useState<Metric | null>(null)
+
+  // Local edit state for the portfolio inputs — synced from the loaded company
+  // so users can type freely without each keystroke being committed.
+  const [sharesInput, setSharesInput] = useState('')
+  const [costInput, setCostInput] = useState('')
+  useEffect(() => {
+    if (c) {
+      setSharesInput(String(c.portfolio.shares || ''))
+      setCostInput(String(c.portfolio.costBasis || ''))
+    }
+  }, [c])
 
   if (isLoading) return <Loading title={ticker} />
   if (!c) {
@@ -52,6 +86,13 @@ export function Company() {
   }
 
   const L = c.latest
+  const pf = c.portfolio
+
+  const savePosition = () => {
+    const shares = Number(sharesInput) || 0
+    const costBasis = Number(costInput) || 0
+    setPosition.mutate({ shares, costBasis })
+  }
 
   return (
     <div className="screen">
@@ -88,6 +129,47 @@ export function Company() {
         <span className="src-mode">mode: {c.sourceMode}</span>
       </div>
 
+      {c.narrative && (
+        <div className="ai-narrative">
+          <span className="ai-narrative-lbl">WHAT'S WORTH KNOWING</span>
+          <p className="ai-narrative-text">{c.narrative}</p>
+        </div>
+      )}
+
+      <div className="pf-edit">
+        <div className="pf-edit-field">
+          <span className="lbl">SHARES</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={sharesInput}
+            onChange={(e) => setSharesInput(e.target.value)}
+          />
+        </div>
+        <div className="pf-edit-field">
+          <span className="lbl">COST BASIS / SHARE</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={costInput}
+            onChange={(e) => setCostInput(e.target.value)}
+          />
+        </div>
+        <Btn kind="primary" sm onClick={savePosition} disabled={setPosition.isPending}>
+          {setPosition.isPending ? 'SAVING…' : 'SAVE'}
+        </Btn>
+        <div className="pf-edit-stats">
+          <span className="lbl">POSITION</span>
+          <span className="pf-edit-val">{fmtMoney(pf.value)}</span>
+          <span className={pf.unrealized >= 0 ? 'delta-up' : 'delta-down'}>
+            {pf.unrealized >= 0 ? '▲' : '▼'} {fmtMoney(Math.abs(pf.unrealized))} ·{' '}
+            {pf.unrealized >= 0 ? '+' : '−'}
+            {Math.abs(pf.unrealizedPct).toFixed(1)}%
+          </span>
+        </div>
+      </div>
+
       {c.status === 'review' && (
         <div className="banner banner-review">
           <span>⚑ This company has unresolved findings.</span>
@@ -110,49 +192,72 @@ export function Company() {
       </div>
 
       {tab === 'results' && (
-        <Panel title={'QUARTERLY RESULTS — last ' + c.history.length + ' periods'} pad={false}>
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th className="sticky-col">METRIC</th>
-                  {c.history.map((h) => (
-                    <th key={h.period}>
-                      <div className="th-period">{h.period}</div>
-                      <div className="th-end">{h.end}</div>
-                    </th>
+        <>
+          <Panel
+            title={'QUARTERLY RESULTS — last ' + c.history.length + ' periods'}
+            pad={false}
+          >
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th className="sticky-col">METRIC</th>
+                    {c.history.map((h) => (
+                      <th key={h.period}>
+                        <div className="th-period">{h.period}</div>
+                        <div className="th-end">{h.end}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ROWS.map(([label, key]) => (
+                    <tr key={key}>
+                      <td className="sticky-col rowlab">{label}</td>
+                      {c.history.map((h, i) => (
+                        <td key={i} className={i === 0 ? 'cell-latest' : ''}>
+                          <span className="cell-val">{h[key]}</span>
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ROWS.map(([label, key]) => (
-                  <tr key={key}>
-                    <td className="sticky-col rowlab">{label}</td>
+                  <tr>
+                    <td className="sticky-col rowlab dim">confidence</td>
                     {c.history.map((h, i) => (
                       <td key={i} className={i === 0 ? 'cell-latest' : ''}>
-                        <span className="cell-val">{h[key]}</span>
+                        <Conf
+                          level={h.conf}
+                          onClick={
+                            i === 0 && L.metrics[2] ? () => setProv(L.metrics[2]) : undefined
+                          }
+                        />
                       </td>
                     ))}
                   </tr>
-                ))}
-                <tr>
-                  <td className="sticky-col rowlab dim">confidence</td>
-                  {c.history.map((h, i) => (
-                    <td key={i} className={i === 0 ? 'cell-latest' : ''}>
-                      <Conf
-                        level={h.conf}
-                        onClick={i === 0 ? () => setProv(L.metrics[2]) : undefined}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
+            <div className="tbl-note">
+              Click a confidence badge on the latest column to inspect where each number was
+              found.
+            </div>
+          </Panel>
+
+          <div className="lbl" style={{ marginBottom: 8 }}>
+            FUTURE FEATURES — PLANNED
           </div>
-          <div className="tbl-note">
-            Click a confidence badge on the latest column to inspect where each number was found.
+          <div className="planned-row">
+            {PLANNED_FEATURES.map((p) => (
+              <div className="planned-tile" key={p.name}>
+                <div className="planned-tile-hd">
+                  <span className="planned-tile-name">{p.name}</span>
+                  <span className="planned-tile-badge">PLANNED</span>
+                </div>
+                <div className="planned-tile-desc">{p.desc}</div>
+              </div>
+            ))}
           </div>
-        </Panel>
+        </>
       )}
 
       {tab === 'validation' && (
@@ -167,7 +272,9 @@ export function Company() {
             <p className="val-detail">{L.validation.detail}</p>
             <div className="val-meta">
               <span>{L.validation.corroborations} corroborating source(s)</span>
-              {L.validation.conflict && <span className="val-conflict">value conflict detected</span>}
+              {L.validation.conflict && (
+                <span className="val-conflict">value conflict detected</span>
+              )}
             </div>
           </div>
           <div className="metric-list">
@@ -187,6 +294,84 @@ export function Company() {
               </div>
             ))}
           </div>
+        </Panel>
+      )}
+
+      {tab === 'news' && (
+        <Panel title={'RECENT NEWS — last 30 days'} pad={false}>
+          {!news || news.length === 0 ? (
+            <div className="empty">No news yet. Finnhub will populate this on the next poll.</div>
+          ) : (
+            <div className="news-list">
+              {news.map((n, i) => (
+                <div className="news-row" key={i}>
+                  <span className="news-t">{n.ts}</span>
+                  <span className="news-src">{n.source}</span>
+                  <div className="news-body">
+                    <a
+                      className="news-headline"
+                      href={n.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {n.headline}
+                    </a>
+                    {n.summary && <div className="news-summary">{n.summary}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      )}
+
+      {tab === 'insider' && (
+        <Panel title="INSIDER TRANSACTIONS — Form 4" pad={false}>
+          {!insider || insider.length === 0 ? (
+            <div className="empty">
+              No insider transactions yet. Finnhub will populate this on the next poll.
+            </div>
+          ) : (
+            <div className="tbl-wrap">
+              <table className="insider-tbl">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Insider</th>
+                    <th>Role</th>
+                    <th>Type</th>
+                    <th className="num">Shares</th>
+                    <th className="num">Price</th>
+                    <th className="num">Value</th>
+                    <th>Filing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insider.map((ix, i) => (
+                    <tr key={i}>
+                      <td>{ix.ts}</td>
+                      <td>{ix.insider}</td>
+                      <td>{ix.role}</td>
+                      <td className={ix.type === 'BUY' ? 'tx-buy' : 'tx-sell'}>{ix.type}</td>
+                      <td className="num">{ix.shares.toLocaleString()}</td>
+                      <td className="num">${ix.price.toFixed(2)}</td>
+                      <td className="num">{fmtMoney(ix.value)}</td>
+                      <td>
+                        <a
+                          href={ix.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--blue)' }}
+                        >
+                          ↗
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Panel>
       )}
 

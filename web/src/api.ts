@@ -1,78 +1,95 @@
 /* Agent Orange — data layer seam (§6).
-   This module is the ONLY place that knows where data comes from. Today it
-   resolves the in-repo fixture; to go live, point these functions at the
-   workers/ REST API (GET /companies, GET /companies/:ticker, GET /review-queue,
-   POST /review-queue/:id/resolve, GET /activity, GET /usage, GET /providers,
-   GET /routing, POST /run) and delete the fixture import. Components and the
-   React Query hooks in hooks.ts don't change. */
-import { AO_DATA } from './data'
+   THE one file that knows where data comes from. Hits the workers/ REST API.
+   Hooks in hooks.ts are the only consumers; components don't know this exists.
+
+   VITE_API_BASE controls the base URL — defaults to local dev. The dev Procfile
+   sets it explicitly. */
 import type {
   ActivityRow,
   Company,
+  DiscoveryStatus,
+  NewsItem,
+  InsiderTx,
+  NotificationPrefs,
+  PortfolioTotals,
   Provider,
   ReviewItem,
   RoutingRule,
+  RunResponse,
   Usage,
 } from './types'
 
-// Simulate network latency so loading states are exercised like the real API.
-const LATENCY = 120
-const wait = <T>(value: T): Promise<T> =>
-  new Promise((resolve) => setTimeout(() => resolve(value), LATENCY))
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000/api/v1'
 
-// Return deep-ish copies so optimistic UI mutations never scribble the fixture.
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+/* --- fetch helpers ------------------------------------------------------ */
 
-export const api = {
-  getCompanies: (): Promise<Company[]> => wait(clone(AO_DATA.companies)),
-
-  getCompany: (ticker: string): Promise<Company | undefined> =>
-    wait(clone(AO_DATA.companies.find((c) => c.ticker === ticker))),
-
-  getReviewQueue: (): Promise<ReviewItem[]> => wait(clone(AO_DATA.reviewQueue)),
-
-  resolveReview: (id: string, choice: string): Promise<{ id: string; choice: string }> =>
-    wait({ id, choice }),
-
-  getActivity: (ticker?: string): Promise<ActivityRow[]> =>
-    wait(
-      clone(ticker ? AO_DATA.activity.filter((a) => a.agent === ticker) : AO_DATA.activity),
-    ),
-
-  getUsage: (): Promise<Usage> => wait(clone(AO_DATA.usage)),
-
-  getProviders: (): Promise<Provider[]> => wait(clone(AO_DATA.providers)),
-
-  getRouting: (): Promise<RoutingRule[]> => wait(clone(AO_DATA.routing)),
-
-  // POST /run — trigger all agents. The real backend kicks off agent jobs and
-  // the UI subscribes to status; here we just resolve after a beat.
-  runAll: (): Promise<{ lastSync: string }> =>
-    new Promise((resolve) => setTimeout(() => resolve({ lastSync: 'just now' }), 2600)),
-
-  // POST /companies — add + discover. The real backend runs a live discovery
-  // agent; here we synthesize a plausible result after a beat.
-  discover: (ticker: string): Promise<DiscoveryResult> =>
-    new Promise((resolve) =>
-      setTimeout(
-        () =>
-          resolve({
-            ir:
-              ticker.toUpperCase() === 'AMD'
-                ? 'ir.amd.com'
-                : 'investors.' + ticker.toLowerCase() + '.com',
-            sec: 'EDGAR · search “' + ticker.toUpperCase() + '”',
-            cadence: 'Quarterly (inferred from last 8 filings)',
-            window: 'predicted ±10 days around prior dates',
-          }),
-        1900,
-      ),
-    ),
+async function get<T>(path: string): Promise<T> {
+  const r = await fetch(API_BASE + path, { credentials: 'omit' })
+  if (!r.ok) throw new Error(`GET ${path} failed: ${r.status} ${r.statusText}`)
+  return r.json() as Promise<T>
 }
 
-export type DiscoveryResult = {
-  ir: string
-  sec: string
-  cadence: string
-  window: string
+async function send<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
+  const r = await fetch(API_BASE + path, {
+    method,
+    credentials: 'omit',
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  if (!r.ok) throw new Error(`${method} ${path} failed: ${r.status} ${r.statusText}`)
+  return r.json() as Promise<T>
+}
+
+/* --- API surface — 1:1 with workers/ao/api/routes_*.py ----------------- */
+
+export const api = {
+  getCompanies: () => get<Company[]>('/companies'),
+  getCompany: (ticker: string) => get<Company>(`/companies/${ticker}`),
+  setPosition: (ticker: string, body: { shares: number; costBasis: number }) =>
+    send<Company>('POST', `/companies/${ticker}/position`, body),
+
+  getReviewQueue: () => get<ReviewItem[]>('/review-queue'),
+  resolveReview: (id: string, choice: string) =>
+    send<{ id: string; choice: string }>('POST', `/review-queue/${id}/resolve`, { choice }),
+
+  getActivity: (ticker?: string) =>
+    get<ActivityRow[]>('/activity' + (ticker ? `?ticker=${ticker}` : '')),
+
+  getUsage: () => get<Usage>('/usage'),
+  getProviders: () => get<Provider[]>('/providers'),
+  getRouting: () => get<RoutingRule[]>('/routing'),
+  putRouting: (body: RoutingRule[]) => send<RoutingRule[]>('PUT', '/routing', body),
+
+  getPortfolioTotals: () => get<PortfolioTotals>('/portfolio/totals'),
+  getNews: (ticker: string, limit = 20) =>
+    get<NewsItem[]>(`/companies/${ticker}/news?limit=${limit}`),
+  getInsider: (ticker: string, limit = 20) =>
+    get<InsiderTx[]>(`/companies/${ticker}/insider?limit=${limit}`),
+
+  getNotificationPrefs: () => get<NotificationPrefs>('/settings/notifications'),
+  putNotificationPrefs: (body: NotificationPrefs) =>
+    send<NotificationPrefs>('PUT', '/settings/notifications', body),
+
+  runAll: () => send<RunResponse>('POST', '/run'),
+  runOne: (ticker: string) => send<RunResponse>('POST', `/companies/${ticker}/run`),
+
+  // POST /companies kicks off discovery; the caller polls /discovery/:jobId
+  // until phase is 'found' (or 'error'). The discover() helper below wraps the
+  // poll loop for the Companies add-flow.
+  startDiscovery: (ticker: string) =>
+    send<RunResponse>('POST', '/companies', { ticker, mode: 'auto' }),
+  getDiscovery: (jobId: string) => get<DiscoveryStatus>(`/discovery/${jobId}`),
+
+  async discover(ticker: string): Promise<DiscoveryStatus['result']> {
+    const { jobId } = await this.startDiscovery(ticker)
+    // Poll up to ~10s. The real agent pipeline will take longer; bump when wired.
+    for (let i = 0; i < 50; i++) {
+      const status = await this.getDiscovery(jobId)
+      if (status.phase === 'found') return status.result
+      if (status.phase === 'error') throw new Error(status.error ?? 'discovery failed')
+      await new Promise((r) => setTimeout(r, 200))
+    }
+    throw new Error('discovery timed out')
+  },
 }

@@ -45,6 +45,53 @@ export type HistoryRow = {
   conf: Conf
 }
 
+/* Portfolio (per-company): live-priced position math. */
+export type Portfolio = {
+  shares: number
+  costBasis: number
+  value: number
+  unrealized: number
+  unrealizedPct: number
+}
+
+/* Watchlist header strip total. */
+export type PortfolioTotals = {
+  totalValue: number
+  totalCost: number
+  unrealized: number
+  unrealizedPct: number
+}
+
+export type NewsItem = {
+  ts: string
+  headline: string
+  summary: string
+  url: string
+  source: string
+}
+
+export type InsiderTx = {
+  ts: string
+  insider: string
+  role: string
+  type: 'BUY' | 'SELL'
+  shares: number
+  price: number
+  value: number
+  url: string
+}
+
+export type NotificationPrefs = {
+  email: string
+  phone: string
+  emailEnabled: boolean
+  smsEnabled: boolean
+  onValidated: boolean
+  onReview: boolean
+  onWatchingStarted: boolean
+  onBudget80: boolean
+}
+
 export type Company = {
   ticker: string
   name: string
@@ -69,6 +116,13 @@ export type Company = {
   sparkLabels: string[]
   nextWindow: { from: string; to: string; label: string }
   history: HistoryRow[]
+  /* Always present — zero when no shares/cost are recorded. */
+  portfolio: Portfolio
+  /* AI "what's worth knowing" — present on deep-dive once validation passes. */
+  narrative: string | null
+  /* Populated on the deep-dive (GET /companies/:ticker); omitted by the list endpoint. */
+  news?: NewsItem[] | null
+  insider?: InsiderTx[] | null
 }
 
 export type ReviewItem = {
@@ -119,3 +173,19 @@ export type AOData = {
   providers: Provider[]
   routing: RoutingRule[]
 }
+
+/* Discovery polling (POST /companies → GET /discovery/:jobId). */
+export type DiscoveryResult = {
+  ir: string
+  sec: string
+  cadence: string
+  window: string
+}
+
+export type DiscoveryStatus = {
+  phase: 'discovering' | 'found' | 'error'
+  result?: DiscoveryResult | null
+  error?: string | null
+}
+
+export type RunResponse = { jobId: string; lastSync: string }

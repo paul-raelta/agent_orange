@@ -2,6 +2,7 @@
    company/:ticker deep-dive. The AppShell is the layout route. */
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './layout/AppShell'
+import { useLiveUpdates } from './live'
 import { Activity } from './screens/Activity'
 import { Companies } from './screens/Companies'
 import { Company } from './screens/Company'
@@ -11,6 +12,8 @@ import { Timeline } from './screens/Timeline'
 import { Watchlist } from './screens/Watchlist'
 
 export default function App() {
+  // One SSE subscription for the whole app, mounted once.
+  useLiveUpdates()
   return (
     <Routes>
       <Route element={<AppShell />}>

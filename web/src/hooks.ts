@@ -1,12 +1,8 @@
 /* Agent Orange — React Query hooks. This is the data layer the components read
-   from; it replaces the prototype's window.AO_DATA global (§6, §8). Server state
-   lives in the query cache; nothing else global is needed. */
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+   from. Server state lives in the query cache; nothing else global is needed. */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
+import type { NotificationPrefs, RoutingRule } from './types'
 
 export const keys = {
   companies: ['companies'] as const,
@@ -16,6 +12,10 @@ export const keys = {
   usage: ['usage'] as const,
   providers: ['providers'] as const,
   routing: ['routing'] as const,
+  portfolioTotals: ['portfolio', 'totals'] as const,
+  news: (ticker: string) => ['news', ticker] as const,
+  insider: (ticker: string) => ['insider', ticker] as const,
+  notificationPrefs: ['settings', 'notifications'] as const,
 }
 
 export const useCompanies = () =>
@@ -38,18 +38,63 @@ export const useProviders = () =>
 export const useRouting = () =>
   useQuery({ queryKey: keys.routing, queryFn: api.getRouting })
 
-export const useResolveReview = () =>
-  useMutation({
+export const usePortfolioTotals = () =>
+  useQuery({ queryKey: keys.portfolioTotals, queryFn: api.getPortfolioTotals })
+
+export const useNews = (ticker: string) =>
+  useQuery({ queryKey: keys.news(ticker), queryFn: () => api.getNews(ticker) })
+
+export const useInsider = (ticker: string) =>
+  useQuery({ queryKey: keys.insider(ticker), queryFn: () => api.getInsider(ticker) })
+
+export const useNotificationPrefs = () =>
+  useQuery({ queryKey: keys.notificationPrefs, queryFn: api.getNotificationPrefs })
+
+export const useResolveReview = () => {
+  const qc = useQueryClient()
+  return useMutation({
     mutationFn: ({ id, choice }: { id: string; choice: string }) =>
       api.resolveReview(id, choice),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.reviewQueue })
+    },
   })
+}
+
+export const useSetPosition = (ticker: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { shares: number; costBasis: number }) =>
+      api.setPosition(ticker, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.company(ticker) })
+      qc.invalidateQueries({ queryKey: keys.companies })
+      qc.invalidateQueries({ queryKey: keys.portfolioTotals })
+    },
+  })
+}
+
+export const useSaveNotificationPrefs = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: NotificationPrefs) => api.putNotificationPrefs(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.notificationPrefs }),
+  })
+}
+
+export const usePutRouting = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: RoutingRule[]) => api.putRouting(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.routing }),
+  })
+}
 
 export const useRunAll = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: api.runAll,
     onSuccess: () => {
-      // The real backend would update statuses; refetch the affected queries.
       qc.invalidateQueries({ queryKey: keys.companies })
       qc.invalidateQueries({ queryKey: keys.activity() })
     },

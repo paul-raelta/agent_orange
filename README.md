@@ -2,62 +2,85 @@
 
 AI agents that fetch, validate, and monitor public-company quarterly/annual
 results — with full provenance on every number. An investor keeps a watchlist;
-one agent per company knows where that company's results live, polls for new
-filings on an unpredictable schedule, extracts the key figures, cross-references
-each one for confidence, and routes anything it can't auto-validate to a human
-review queue.
+one agent per company knows where that company's results live (SEC EDGAR +
+the IR site), polls for new filings on an unpredictable schedule, extracts
+the key figures, cross-references each one for confidence, and routes
+anything it can't auto-validate to a human review queue.
 
-This repo is the productionized build of a design handoff. The full product
-brief — screen specs, data contract, interaction details, design tokens — lives
+The full product brief — screen specs, data contract, design tokens — lives
 in [`design/HANDOFF.md`](design/HANDOFF.md).
 
 ## Layout
 
 ```
 agent_orange/
-  design/       Design reference: the HTML/React prototype + HANDOFF.md (the brief)
+  design/       HTML/React prototype + HANDOFF.md (the original brief)
   screenshots/  Rendered captures of every screen
-  web/          Production UI — Vite + React 18 + TypeScript (built)
-  workers/      Agentic backend — stub for now (see design/HANDOFF.md §12)
+  web/          Production UI — Vite + React 18 + TypeScript
+  workers/      Agentic backend — Python + FastAPI + SQLite + APScheduler
+  Makefile      One-line targets: setup, seed, dev, api, daemon, web, test, build
+  Procfile.dev  3-process dev runtime (api + scheduler + web) for overmind
 ```
+
+## Quick start
+
+```bash
+make setup           # creates workers/.venv, installs Python + npm deps
+make seed            # populates workers/var/ao.db with NVDA + SNDK + MU
+make api             # API at http://localhost:8000  (one terminal)
+make web             # UI at http://localhost:5173   (another terminal)
+make daemon          # scheduler — polls EDGAR + Finnhub on cadence (optional)
+```
+
+Or run all three together with [overmind](https://github.com/DarthSim/overmind):
+```bash
+brew install overmind
+make dev
+```
+
+Then open <http://localhost:5173>.
 
 ## web/ — the UI
 
-The production reimplementation of the prototype, pixel-faithful to the design.
+Pixel-faithful reimplementation of the prototype.
 
-- **Vite + React 18 + TypeScript** — replaces the prototype's CDN React + in-browser Babel.
-- **React Router** — routes `watchlist` (`/`), `timeline`, `review`, `companies`,
-  `activity`, `settings`, plus the `company/:ticker` deep-dive.
-- **TanStack Query** — the data layer. `src/hooks.ts` wraps `src/api.ts`, which is
-  the single seam that replaces the prototype's `window.AO_DATA` global. Today it
-  resolves the in-repo fixture (`src/data.ts`); to go live, point `api.ts` at the
-  `workers/` REST API and delete the fixture — components don't change.
-- **Token-driven CSS** — `src/styles/tokens.css` holds the design tokens as CSS
-  custom properties; nothing hardcodes hex. A `ThemeProvider` rewrites a subset at
-  runtime (accent / surface / mono font / density) — the in-app **Tweaks** panel
-  (⚙, bottom-right) is the optional theme switcher.
-- **Responsive** at a single 700px breakpoint via a container query on the app
-  shell (sidebar → bottom tab bar, grids → one column).
-
-```bash
-cd web
-npm install
-npm run dev      # local dev server
-npm run build    # type-check + production build to web/dist
-npm run preview  # serve the production build
-```
+- **Vite + React 18 + TypeScript**, React Router, TanStack Query
+- **Token-driven CSS** — `src/styles/tokens.css` + a ThemeProvider rewriting
+  CSS variables (accent / surface / mono / density). The optional Tweaks
+  panel (⚙ bottom-right) is the in-app theme switcher
+- **Responsive** at a 700px container-query breakpoint
+- **Live updates** via SSE on `/api/v1/events` — Watchlist + Review queue
+  refresh without a page reload as the backend processes filings
+- All seven screens ported plus new portfolio strip (Watchlist), AI narrative
+  card + portfolio editor + NEWS / INSIDER tabs + PLANNED future-feature
+  tiles (Company deep-dive), NOTIFICATIONS panel (Settings)
 
 ## workers/ — the agentic backend
 
-Not built yet — a stub. The intended shape (per-company agents with
-discovery → monitoring poll → extraction → validation stages, scheduled polling
-that intensifies inside a predicted filing window, SEC EDGAR as the structured
-backbone, provider-agnostic model routing) is sketched in
-[`design/HANDOFF.md`](design/HANDOFF.md) §12. The UI's data contract (§6) is the
-interface it must serve.
+Python 3.12 + FastAPI + SQLite + SQLAlchemy 2.x async + APScheduler.
+
+- **API**: 20 endpoints serving the wire contract from `web/src/types.ts`,
+  with the serializer layer in `ao/api/serializers.py` as the contract gate
+- **Integrations**: SEC EDGAR (filing detection + download), Finnhub
+  (quotes / news / Form 4 insider tx), Anthropic SDK (Opus + tool use for
+  extraction, validation, narrative), Gmail SMTP, Twilio SMS
+- **Agent pipeline**: monitor → download → extract → validate → narrative →
+  notify. Idempotent per `(filing_id, stage)`. LLM stages gracefully no-op
+  when `ANTHROPIC_API_KEY` isn't set
+- **Scheduler**: APScheduler running poll_company (per ticker, daily 06:00
+  UTC), refresh_prices (5 min during US market hours), refresh_news_insider
+  (30 min), recompute_windows (daily). Portable — same code runs locally
+  now and on Cloud Run later via `AO_SCHEDULER_MODE=external`
+- **Notifications**: UI (SSE), email (Gmail SMTP), SMS (Twilio). Per-event
+  opt-in via the Settings → NOTIFICATIONS panel
+
+See [`workers/README.md`](workers/README.md) for the full CLI surface and a
+status matrix of what's wired vs. what needs API keys.
 
 ## Hosting (planned)
 
-Firebase Hosting (UI) → Cloud Run API (`workers/`) → Firestore, with Cloud
-Scheduler driving the polling cadence and Secret Manager holding API keys. See
-HANDOFF §13.
+Firebase Hosting (UI) → Cloud Run (workers API + scheduler service) → Cloud
+SQL Postgres, with Cloud Scheduler driving the polling cadence and Secret
+Manager holding API keys. See HANDOFF §13. The migration is config-only:
+swap `DATABASE_URL`, set `AO_SCHEDULER_MODE=external`, point `VITE_API_BASE`
+at the Cloud Run URL.

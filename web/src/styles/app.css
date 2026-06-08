@@ -1799,6 +1799,317 @@ select.inp {
   background: transparent;
 }
 
+/* ===== Portfolio strip (Watchlist header) ===== */
+.pf-strip {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  margin-bottom: 16px;
+}
+.pf-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pf-val {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.pf-val-dim {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.pf-pct {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+/* per-card position line on Watchlist cards */
+.wl-position {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.wl-position .lbl {
+  font-size: 8.5px;
+}
+.wl-position-val {
+  font-size: 13px;
+  font-weight: 700;
+}
+.wl-position-pl {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* ===== Company deep-dive: AI narrative card ===== */
+.ai-narrative {
+  display: flex;
+  gap: 11px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r);
+  margin-bottom: 16px;
+}
+.ai-narrative-lbl {
+  font-size: 8.5px;
+  letter-spacing: 0.13em;
+  color: var(--accent);
+  font-weight: 700;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+.ai-narrative-text {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.55;
+  flex: 1;
+  min-width: 0;
+}
+
+/* portfolio editor on Company deep-dive */
+.pf-edit {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel-2);
+}
+.pf-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 110px;
+}
+.pf-edit-field input {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 130px;
+}
+.pf-edit-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pf-edit-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: auto;
+  text-align: right;
+}
+.pf-edit-stats .pf-edit-val {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* news tab — stacked list */
+.news-list {
+  display: flex;
+  flex-direction: column;
+}
+.news-row {
+  display: grid;
+  grid-template-columns: 110px 90px 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.news-row:last-child {
+  border-bottom: none;
+}
+.news-t {
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.news-src {
+  font-size: 9.5px;
+  color: var(--text-2);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.news-body {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.news-headline {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.news-headline:hover {
+  color: var(--accent);
+}
+.news-summary {
+  color: var(--text-2);
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+/* insider tab — compact table */
+.insider-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.insider-tbl th,
+.insider-tbl td {
+  padding: 8px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+}
+.insider-tbl thead th {
+  background: var(--panel-2);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.insider-tbl .tx-buy {
+  color: var(--green);
+  font-weight: 700;
+}
+.insider-tbl .tx-sell {
+  color: var(--red);
+  font-weight: 700;
+}
+.insider-tbl td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* planned tiles row */
+.planned-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.planned-tile {
+  background: var(--panel-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  padding: 11px 13px;
+  opacity: 0.78;
+}
+.planned-tile-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.planned-tile-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+.planned-tile-badge {
+  font-size: 8.5px;
+  letter-spacing: 0.13em;
+  color: var(--text-3);
+  font-weight: 700;
+}
+.planned-tile-desc {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
+/* notifications settings rows */
+.notif-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.notif-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-2);
+  font-family: var(--sans);
+}
+.notif-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.notif-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.notif-toggle input {
+  appearance: none;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  cursor: pointer;
+  transition: 0.12s;
+  flex: 0 0 auto;
+}
+.notif-toggle input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: 0.12s;
+}
+.notif-toggle input:checked {
+  background: var(--accent);
+}
+.notif-toggle input:checked::before {
+  background: var(--bg);
+  transform: translateX(12px);
+}
+.notif-save {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 /* ===== Tweaks toggle button (in-app theme switcher per §11) ===== */
 .tweaks-fab {
   position: fixed;

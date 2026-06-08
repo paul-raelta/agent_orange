@@ -32,3 +32,21 @@ pnpm-debug.log*
 
 # TS build info
 *.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# workers runtime state
+workers/var/
+workers/*.db
+workers/*.db-journal
+workers/*.db-wal
+workers/*.db-shm
