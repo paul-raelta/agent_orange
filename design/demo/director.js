@@ -296,8 +296,10 @@
 
   // ---------- fit scaling ----------
   function fit() {
-    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-    frame.style.transform = `translate(-50%, -50%) scale(${s})`;
+    const reserved = 104; // viewport px reserved at the bottom for the controls bar
+    const s = Math.min(window.innerWidth / 1920, (window.innerHeight - reserved) / 1080);
+    // center the frame in the area ABOVE the controls (shift up by half the reserve)
+    frame.style.transform = `translate(-50%, calc(-50% - ${reserved / 2}px)) scale(${s})`;
   }
   window.addEventListener("resize", fit);
   fit();
