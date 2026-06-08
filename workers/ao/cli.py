@@ -171,6 +171,141 @@ def poll(ticker: str) -> None:
     asyncio.run(_go())
 
 
+@app.command(name="force-run")
+def force_run(ticker: str) -> None:
+    """Re-run extraction → validation → narrative against the most recent filing
+    for TICKER, bypassing the monitoring stage. Useful for retrying after a
+    parser fix or prompt change without waiting for a new filing."""
+    import asyncio as _asyncio
+    from pathlib import Path
+    from sqlalchemy import desc, select
+    from ao.agents import extraction, narrative, validation
+    from ao.db import models as m
+    from ao.db.engine import get_engine, get_sessionmaker
+    from ao.integrations import edgar_client
+    from ao.notify import dispatcher
+    from ao.notify.events import Event
+
+    async def _go() -> None:
+        user_id = get_settings().user_id
+        Session = get_sessionmaker()
+        async with Session() as session:
+            c = (await session.execute(
+                select(m.Company).where(
+                    m.Company.user_id == user_id, m.Company.ticker == ticker.upper(),
+                )
+            )).scalar_one_or_none()
+            if c is None:
+                typer.echo(f"Unknown ticker '{ticker}'. Run `ao seed` first.")
+                return
+            f = (await session.execute(
+                select(m.Filing).where(m.Filing.company_id == c.id)
+                .order_by(desc(m.Filing.discovered_at)).limit(1)
+            )).scalar_one_or_none()
+            if f is None:
+                typer.echo(f"No filings on file for {ticker.upper()}. Run `ao poll {ticker}` first.")
+                return
+
+            if not f.local_path or not Path(f.local_path).exists():
+                typer.echo(f"Downloading {f.form_type} accession {f.accession}…")
+                local = await edgar_client.download_filing(c.cik, f.accession or "", f.source_url or "")
+                f.local_path = str(local)
+                await session.commit()
+
+            typer.echo(f"Extracting from {f.local_path}…")
+            extracted = await extraction.extract_filing(
+                session, user_id, company_id=c.id, ticker=ticker.upper(),
+                pdf_path=Path(f.local_path),
+            )
+            typer.echo(f"  → {len(extracted)} metric locations")
+            for e in extracted:
+                tag = "✓" if e.verified else "?"
+                typer.echo(f"    {tag} {e.key:18} {e.display_value:12} p.{e.page}")
+
+            if not extracted:
+                return
+
+            typer.echo("Validating…")
+            verdict = await validation.validate_metrics(
+                session, user_id, company_id=c.id, ticker=ticker.upper(), extracted=extracted,
+            )
+            if verdict:
+                typer.echo(
+                    f"  → passed={verdict.passed} conflict={verdict.conflict} "
+                    f"corrob={verdict.corroborations}"
+                )
+
+            typer.echo("Writing narrative…")
+            current = {e.key: e.display_value for e in extracted}
+            story = await narrative.write_narrative(
+                session, user_id, company_id=c.id, ticker=ticker.upper(), current=current,
+            )
+            if story:
+                typer.echo(f"  → {story}")
+
+            # Persist Result + Metric + Provenance + fire event.
+            from uuid import uuid4
+            from datetime import datetime, timezone
+
+            # Demote prior latest.
+            prior_latest = (await session.execute(
+                select(m.Result).where(m.Result.company_id == c.id, m.Result.is_latest == True)
+            )).scalars().all()
+            for r in prior_latest:
+                r.is_latest = False
+
+            now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            result = m.Result(
+                id=uuid4().hex, company_id=c.id, filing_id=f.id,
+                period=f.period or f.form_type, period_end=f.period_end or "",
+                reported_on=f.reported_on or now_iso,
+                validated_on=now_iso if (verdict and verdict.passed) else None,
+                validation_passed=bool(verdict and verdict.passed),
+                validation_rule=verdict.rule if verdict else "",
+                validation_detail=verdict.detail if verdict else "",
+                validation_corroborations=verdict.corroborations if verdict else 0,
+                validation_conflict=bool(verdict and verdict.conflict),
+                narrative=story, is_latest=True,
+            )
+            session.add(result)
+
+            by_key: dict[str, list] = {}
+            for e in extracted:
+                by_key.setdefault(e.key, []).append(e)
+            confs: dict[str, str] = {}
+            if verdict:
+                for v in verdict.per_metric:
+                    confs[v.key] = v.conf
+            for key, locations in by_key.items():
+                metric = m.Metric(
+                    id=uuid4().hex, result_id=result.id, key=key,
+                    display_value=locations[0].display_value,
+                    raw_value=locations[0].raw_value,
+                    yoy=None, conf=confs.get(key, "med"),
+                )
+                session.add(metric)
+                for i, loc in enumerate(locations):
+                    session.add(m.Provenance(
+                        id=uuid4().hex, metric_id=metric.id, rank=i,
+                        source_label=loc.source_label, url=f.source_url or "",
+                        page=loc.page, quote=loc.quote,
+                    ))
+            await session.commit()
+            typer.echo("✓ Persisted Result + Metric + Provenance")
+
+            if verdict and verdict.passed:
+                await dispatcher.dispatch(Event(
+                    type="validated", ticker=ticker.upper(),
+                    payload={"period": result.period,
+                             "revenue": next((e.display_value for e in extracted if e.key=="Revenue"), "?"),
+                             "eps_diluted": next((e.display_value for e in extracted if e.key=="EPS · diluted"), "?")},
+                ))
+                typer.echo("✓ Dispatched `validated` event (email + SMS)")
+        await get_engine().dispose()
+
+    _asyncio.run(_go())
+
+
 @app.command()
 def discover(ticker: str) -> None:
     """Run the discovery stage — find CIK + IR URL + cadence for a ticker."""
