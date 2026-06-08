@@ -225,14 +225,14 @@ def _seed_sndk(session, user: m.User) -> m.Company:
         sector="Storage / Flash memory", currency="USD",
         cadence="Quarterly", fiscal_note="Spun off from WDC",
         status="review", source_mode="guided",
-        cik="0002012896", ir_url="https://investors.sandisk.com",
+        cik="2023554", ir_url="https://investors.sandisk.com",
         shares=200, cost_basis=48.5,
         next_window_from="Oct 28, 2026", next_window_to="Nov 12, 2026",
         next_window_label="Fiscal Q1 expected",
     )
     session.add_all([
         m.Source(company_id=c.id, kind="IR", label="investors.sandisk.com", is_primary=True),
-        m.Source(company_id=c.id, kind="SEC", label="EDGAR · CIK 0002012896"),
+        m.Source(company_id=c.id, kind="SEC", label="EDGAR · CIK 0002023554"),
     ])
 
     history = [
