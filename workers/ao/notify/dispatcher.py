@@ -100,7 +100,7 @@ def _subject_and_body(event: Event) -> tuple[str, str]:
 
 async def dispatch(event: Event) -> None:
     """Send the event over all configured channels and broadcast to SSE."""
-    log.info("notify.dispatch", event=event.type, ticker=event.ticker)
+    log.info("notify.dispatch", event_type=event.type, ticker=event.ticker)
 
     # Always broadcast over SSE (the UI's live update path).
     await _broadcast(event)

@@ -59,9 +59,12 @@ async def complete(
     started = datetime.now(timezone.utc)
 
     kwargs: dict[str, Any] = {
-        "model": model, "messages": messages,
-        "max_tokens": max_tokens, "temperature": temperature,
+        "model": model, "messages": messages, "max_tokens": max_tokens,
     }
+    # Opus 4.7+ / Sonnet 4.6+ deprecate `temperature` (the value is fixed by the
+    # model). Only pass it on older models where it still applies.
+    if not (model.startswith("claude-opus-4-7") or model.startswith("claude-sonnet-4-6")):
+        kwargs["temperature"] = temperature
     if system is not None:
         kwargs["system"] = system
     if tools:
