@@ -10,6 +10,7 @@ import {
   useRouting,
   useSaveNotificationPrefs,
   useUsage,
+  useWipe,
 } from '../hooks'
 import { useShell } from '../layout/shellContext'
 import type { RunFeedback } from '../layout/shellContext'
@@ -25,6 +26,8 @@ export function Settings() {
   const { data: prefs } = useNotificationPrefs()
   const savePrefs = useSaveNotificationPrefs()
   const { runFeedback, setRunFeedback } = useShell()
+  const wipe = useWipe()
+  const [confirmWipe, setConfirmWipe] = useState(false)
 
   // Local edit state for the notifications form — committed on Save.
   const [draft, setDraft] = useState<NotificationPrefs | null>(null)
@@ -254,6 +257,66 @@ export function Settings() {
             ))}
           </div>
         </div>
+      </Panel>
+
+      <Panel
+        title="FIRST-TIME EXPERIENCE"
+        right={<span className="hint">destructive — wipes all fetched data</span>}
+      >
+        <p
+          style={{
+            fontFamily: 'var(--sans)',
+            fontSize: 12,
+            color: 'var(--text-2)',
+            lineHeight: 1.55,
+            marginBottom: 12,
+          }}
+        >
+          Clear every filing, result, metric, agent run, price snapshot, news
+          item, insider transaction and usage row — keeping your tracked
+          companies, positions, sources, model routing, and notification
+          settings. After wipe, click <b>RUN ALL AGENTS</b> on the Watchlist
+          to repopulate everything with live data: real EDGAR filings, real
+          Finnhub prices/news/insider, real Opus extraction + validation +
+          narrative, and real email + SMS notifications.
+        </p>
+        {!confirmWipe ? (
+          <Btn kind="danger" sm onClick={() => setConfirmWipe(true)}>
+            RESET TO FIRST-TIME STATE
+          </Btn>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontFamily: 'var(--sans)',
+                fontSize: 12,
+                color: 'var(--red)',
+              }}
+            >
+              This is destructive. Confirm:
+            </span>
+            <Btn
+              kind="danger"
+              sm
+              onClick={() =>
+                wipe.mutate(undefined, {
+                  onSuccess: () => setConfirmWipe(false),
+                })
+              }
+              disabled={wipe.isPending}
+            >
+              {wipe.isPending ? 'WIPING…' : 'YES, WIPE EVERYTHING'}
+            </Btn>
+            <Btn kind="ghost" sm onClick={() => setConfirmWipe(false)}>
+              Cancel
+            </Btn>
+            {wipe.isSuccess && (
+              <span style={{ color: 'var(--green)', fontSize: 11 }}>
+                ✓ Wiped — go to Watchlist and click RUN ALL AGENTS
+              </span>
+            )}
+          </div>
+        )}
       </Panel>
 
       <Panel title="SCHEDULE & VALIDATION DEFAULTS">

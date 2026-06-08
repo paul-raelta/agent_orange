@@ -37,6 +37,18 @@ def seed(ticker: str = typer.Argument(None, help="Only seed this ticker; default
     asyncio.run(seed_all(ticker.upper() if ticker else None))
 
 
+@app.command()
+def wipe(
+    no_demo: bool = typer.Option(False, "--no-demo", help="Don't re-seed the demo review items"),
+) -> None:
+    """Wipe fetched data (filings/results/metrics/activity/prices/news/insider)
+    while keeping companies + their config. UI looks like a first-time visit;
+    one click of RUN ALL AGENTS repopulates it with live data.
+    """
+    from ao.db.wipe import wipe as _wipe
+    asyncio.run(_wipe(reseed_demo_review=not no_demo))
+
+
 @app.command(name="finnhub-test")
 def finnhub_test(ticker: str) -> None:
     """Live smoke test of the Finnhub client. Prints quote + a sample of recent news + insider."""

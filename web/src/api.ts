@@ -74,6 +74,11 @@ export const api = {
   runAll: () => send<RunResponse>('POST', '/run'),
   runOne: (ticker: string) => send<RunResponse>('POST', `/companies/${ticker}/run`),
 
+  // Admin — wipes fetched data (filings, results, metrics, activity, prices,
+  // news, insider, usage). Keeps companies + their config. The Review screen
+  // gets its demo items re-seeded so the feature is still demonstrable.
+  wipe: () => send<{ status: string }>('POST', '/admin/wipe'),
+
   // POST /companies kicks off discovery; the caller polls /discovery/:jobId
   // until phase is 'found' (or 'error'). The discover() helper below wraps the
   // poll loop for the Companies add-flow.

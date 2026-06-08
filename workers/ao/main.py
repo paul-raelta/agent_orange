@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     # (FastAPI router objects don't open DB connections).
     from ao.api import (
         routes_activity,
+        routes_admin,
         routes_companies,
         routes_events,
         routes_health,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_news.router, prefix=prefix)
     app.include_router(routes_portfolio.router, prefix=prefix)
     app.include_router(routes_events.router, prefix=prefix)
+    app.include_router(routes_admin.router, prefix=prefix)
 
     return app
 

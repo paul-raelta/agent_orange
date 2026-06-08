@@ -37,13 +37,36 @@ async def _bg_run(user_id: str, ticker: str) -> None:
 
 
 async def _bg_run_all(user_id: str) -> None:
+    """One-click full refresh: pipeline per company, plus price/news/insider
+    pulls and window recompute. So a freshly-wiped UI lights up fully after
+    a single RUN ALL AGENTS click."""
+    from ao.scheduler.jobs import (
+        recompute_windows, refresh_news_insider, refresh_prices,
+    )
+
     Session = get_sessionmaker()
     async with Session() as session:
         rows = (await session.execute(
             select(m.Company.ticker).where(m.Company.user_id == user_id)
         )).all()
+
+    # Per-company pipeline (monitor → extract → validate → narrative → notify).
     for (ticker,) in rows:
-        await _bg_run(user_id, ticker)
+        try:
+            await _bg_run(user_id, ticker)
+        except Exception as exc:  # noqa: BLE001
+            log.error("bg_run_all.company_failed", ticker=ticker, error=str(exc))
+
+    # Side-channel refreshes — populate the rest of the UI.
+    for label, fn in (
+        ("prices", refresh_prices),
+        ("news_insider", refresh_news_insider),
+        ("windows", recompute_windows),
+    ):
+        try:
+            await fn()
+        except Exception as exc:  # noqa: BLE001
+            log.error("bg_run_all.side_refresh_failed", step=label, error=str(exc))
 
 router = APIRouter(tags=["run"])
 

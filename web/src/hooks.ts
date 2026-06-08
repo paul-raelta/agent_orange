@@ -102,3 +102,14 @@ export const useRunAll = () => {
 }
 
 export const useDiscover = () => useMutation({ mutationFn: api.discover })
+
+export const useWipe = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.wipe,
+    onSuccess: () => {
+      // After wipe every read changes — drop the whole cache.
+      qc.invalidateQueries()
+    },
+  })
+}
