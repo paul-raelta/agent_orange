@@ -10,11 +10,22 @@ anything it can't auto-validate to a human review queue.
 The full product brief — screen specs, data contract, design tokens — lives
 in [`design/HANDOFF.md`](design/HANDOFF.md).
 
+## Demo
+
+A ~86-second product walkthrough (autoplay + captions + simulated cursor)
+lives at [`docs/index.html`](docs/index.html) and is the publishable file —
+served as **<https://paul-raelta.github.io/agent_orange/>** once GitHub
+Pages is enabled (Settings → Pages → Branch: `main`, Folder: `/docs`). The
+editable source is in [`design/demo/`](design/demo/); see that folder's
+[README](design/demo/README.md) for the bundle layout and re-bundle
+instructions.
+
 ## Layout
 
 ```
 agent_orange/
-  design/       HTML/React prototype + HANDOFF.md (the original brief)
+  design/       HTML/React prototype + HANDOFF.md (the original brief) + demo/ bundle
+  docs/         GitHub-Pages-published demo (single self-contained index.html)
   screenshots/  Rendered captures of every screen
   web/          Production UI — Vite + React 18 + TypeScript
   workers/      Agentic backend — Python + FastAPI + SQLite + APScheduler
