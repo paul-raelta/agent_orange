@@ -19,8 +19,12 @@ import type {
   Usage,
 } from './types'
 
+// Default to the same hostname the UI was loaded from so LAN access works:
+// open http://<your-mac-ip>:5173 from your phone and the UI hits the API at
+// http://<your-mac-ip>:8000. Override with VITE_API_BASE for any other setup.
 const API_BASE =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000/api/v1'
+  (import.meta.env.VITE_API_BASE as string | undefined) ??
+  `${window.location.protocol}//${window.location.hostname}:8000/api/v1`
 
 /* --- fetch helpers ------------------------------------------------------ */
 

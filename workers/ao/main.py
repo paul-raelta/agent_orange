@@ -45,10 +45,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="Agent Orange API", version="0.1.0", lifespan=lifespan)
 
+    # allow_origins=['*'] requires allow_credentials=False per the CORS spec.
+    # We don't ship cookies in v1 (no auth flow) so that's fine.
+    using_wildcard = "*" in settings.cors_origins
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=True,
+        allow_credentials=not using_wildcard,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -91,11 +94,14 @@ app = create_app()
 
 
 def run_api() -> None:
-    """Console-script entry: `ao-api`."""
+    """Console-script entry: `ao-api`. Bind to 0.0.0.0 so LAN access works
+    (your phone / iPad / another laptop hitting your Mac's IP). Lock down by
+    setting AO_API_HOST if you want strictly local-only."""
     settings = get_settings()
+    import os
     uvicorn.run(
         "ao.main:app",
-        host="127.0.0.1",
+        host=os.getenv("AO_API_HOST", "0.0.0.0"),
         port=settings.api_port,
         log_level=settings.log_level.lower(),
     )

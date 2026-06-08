@@ -31,9 +31,10 @@ class Settings(BaseSettings):
     # --- App ---
     api_port: int = Field(8000, alias="API_PORT")
     log_level: str = Field("INFO", alias="AO_LOG_LEVEL")
-    cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
-    )
+    # Wide open during local dev so the UI works from any LAN device
+    # (phone, tablet, second laptop). Tightened to your real origin list when
+    # the app moves behind a domain.
+    cors_origins: list[str] = Field(default_factory=lambda: ["*"])
 
     # --- Database ---
     # Stored in workers/var/ao.db locally. Postgres URL swaps in for cloud.

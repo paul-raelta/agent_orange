@@ -10,17 +10,18 @@ setup:
 seed:
 	cd workers && .venv/bin/python -m ao.db.seed
 
-# Run the API only (foreground)
+# Run the API only (foreground). Bound to 0.0.0.0 so LAN devices can hit it.
 api:
-	cd workers && .venv/bin/uvicorn ao.main:app --port 8000 --reload
+	cd workers && .venv/bin/uvicorn ao.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Run the scheduler daemon only (foreground)
 daemon:
 	cd workers && .venv/bin/python -m ao.daemon
 
-# Run the UI dev server only (foreground)
+# Run the UI dev server only (foreground). Vite binds to 0.0.0.0 via
+# vite.config.ts and prints both Local + Network URLs on startup.
 web:
-	cd web && VITE_API_BASE=http://localhost:8000/api/v1 npm run dev
+	cd web && npm run dev
 
 # Bring up everything via overmind (requires `brew install overmind` or `tmuxinator`).
 dev:

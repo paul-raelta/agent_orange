@@ -10,8 +10,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { keys } from './hooks'
 
 const SSE_URL =
-  ((import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8000/api/v1') +
-  '/events'
+  ((import.meta.env.VITE_API_BASE as string | undefined) ??
+    `${window.location.protocol}//${window.location.hostname}:8000/api/v1`) + '/events'
 
 export function useLiveUpdates() {
   const qc = useQueryClient()
