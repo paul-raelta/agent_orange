@@ -20,6 +20,9 @@
   const lerp = (a, b, f) => a + (b - a) * f;
   function easeInOut(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
   let lastZoom = 1.04;
+  // Vertical centering target for the camera. Below frame-center (540) so the app
+  // sits a touch higher, reserving a clear band at the bottom for captions.
+  const CY = 466;
 
   function appPoint(target) {
     if (Array.isArray(target)) return { x: target[0], y: target[1] };
@@ -28,7 +31,11 @@
     if (!el) return { x: 720, y: 450 };
     const r = el.getBoundingClientRect();
     const c = camera.getBoundingClientRect();
-    return { x: (r.left + r.width / 2 - c.left) / lastZoom, y: (r.top + r.height / 2 - c.top) / lastZoom };
+    // Derive the TRUE on-screen scale from the camera's rendered size (1440×900
+    // content). This folds in BOTH the camera zoom AND the outer #frame scale, so
+    // app-local coords are correct on any viewport size (translate-centered frame).
+    const sx = c.width / 1440 || 1, sy = c.height / 900 || 1;
+    return { x: (r.left + r.width / 2 - c.left) / sx, y: (r.top + r.height / 2 - c.top) / sy };
   }
 
   function sampleTrack(kfs, lt) {
@@ -90,32 +97,43 @@
         { t: 3, kicker: "Running", line: "Each agent goes and finds its company's latest filing." },
       ],
     },
-    // 5 — NVDA NARRATIVE
+    // 5 — NOTIFICATIONS (laptop email + phone SMS)
     {
-      start: 32, screen: "company", params: { ticker: "NVDA", tab: "results" },
+      start: 31, screen: "notify",
+      params: (lt) => ({ nEmail: lt > 4 ? 3 : lt > 2.4 ? 2 : lt > 1 ? 1 : 0, nSms: lt > 8.4 ? 2 : lt > 6.8 ? 1 : 0 }),
+      cam: [{ t: 0, focus: "full", zoom: 1.02 }, { t: 1.4, focus: ".mailwin", zoom: 1.16 }, { t: 5.4, focus: ".mailwin", zoom: 1.16 }, { t: 6.6, focus: ".phone", zoom: 1.34 }, { t: 11, focus: ".phone", zoom: 1.3 }],
+      cursor: [{ t: 0, at: [720, 470] }, { t: 1.8, at: ".mail-row.unread" }, { t: 4.5, at: ".mail-list" }, { t: 6.8, at: ".phone" }],
+      captions: [
+        { t: 0, kicker: "Notifications", line: "I don't sit and watch — <b>it reaches me.</b>" },
+        { t: 6.6, kicker: "Email + SMS", line: "A mail and a text the moment results land — or need me." },
+      ],
+    },
+    // 6 — NVDA NARRATIVE
+    {
+      start: 42, screen: "company", params: { ticker: "NVDA", tab: "results" },
       cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 1.6, focus: ".ai-narrative", zoom: 1.3 }, { t: 6, focus: ".ai-narrative", zoom: 1.3 }],
       cursor: [{ t: 0, at: [300, 300] }, { t: 1.8, at: ".ai-narrative" }],
       captions: [{ t: 0, kicker: "NVDA · Q1 FY26", line: "NVIDIA's 10-Q landed. The agent <b>summarizes what matters.</b>" }],
     },
-    // 6 — VALIDATION
+    // 7 — VALIDATION
     {
-      start: 38, screen: "company", params: (lt) => ({ ticker: "NVDA", tab: lt >= 1.2 ? "validation" : "results" }),
+      start: 48, screen: "company", params: (lt) => ({ ticker: "NVDA", tab: lt >= 1.2 ? "validation" : "results" }),
       cam: [{ t: 0, focus: ".tabs", zoom: 1.2 }, { t: 1.2, focus: ".tabs", zoom: 1.2 }, { t: 2.2, focus: ".val-card", zoom: 1.16 }, { t: 7, focus: ".val-card", zoom: 1.14 }],
-      cursor: [{ t: 0, at: [300, 360] }, { t: 0.9, at: '[data-tab="validation"]' }, { t: 3, at: EPS }, { t: 6.5, at: EPS }],
+      cursor: [{ t: 0, at: [300, 360] }, { t: 0.9, at: '[data-tab="validation"]' }, { t: 1.5, at: '[data-tab="validation"]' }, { t: 3, at: EPS }, { t: 6.5, at: EPS }],
       clicks: [{ t: 1.0, at: '[data-tab="validation"]' }],
       captions: [{ t: 0, kicker: "Validation", line: "Every number is <b>cross-checked across the filing</b> — and this one passed." }],
     },
-    // 7 — PROVENANCE DRAWER
+    // 8 — PROVENANCE DRAWER
     {
-      start: 45, screen: "company", params: (lt) => ({ ticker: "NVDA", tab: "validation", drawerKey: lt >= 1 ? "EPS · diluted" : null }),
+      start: 55, screen: "company", params: (lt) => ({ ticker: "NVDA", tab: "validation", drawerKey: lt >= 1 ? "EPS · diluted" : null }),
       cam: [{ t: 0, focus: EPS, zoom: 1.24 }, { t: 1, focus: EPS, zoom: 1.24 }, { t: 2, focus: ".drawer", zoom: 1.12 }, { t: 10, focus: ".drawer", zoom: 1.1 }],
-      cursor: [{ t: 0, at: EPS }, { t: 1.4, at: ".drawer .prov:nth-child(3)" }, { t: 4, at: ".drawer .prov-quote" }, { t: 9, at: ".drawer .prov-quote" }],
+      cursor: [{ t: 0, at: EPS }, { t: 1.2, at: EPS }, { t: 2.4, at: ".drawer .prov-quote" }, { t: 9, at: ".drawer .prov-quote" }],
       clicks: [{ t: 0.85, at: EPS }],
       captions: [{ t: 0, kicker: "Provenance", line: "EPS <b>$2.39</b> — traced to three independent sources, down to the page." }],
     },
-    // 8 — REVIEW QUEUE
+    // 9 — REVIEW QUEUE
     {
-      start: 55, screen: "review", params: (lt) => ({ resolved: lt >= 7 ? "$0.82" : null }),
+      start: 64, screen: "review", params: (lt) => ({ resolved: lt >= 7 ? "$0.82" : null }),
       cam: [{ t: 0, focus: "full", zoom: 1.06 }, { t: 1.4, focus: ".rv-candidates", zoom: 1.32 }, { t: 6, focus: ".rv-candidates", zoom: 1.3 }, { t: 7.4, focus: ".rv-card", zoom: 1.12 }, { t: 11, focus: ".rv-card", zoom: 1.1 }],
       cursor: [{ t: 0, at: [400, 300] }, { t: 2, at: ".rv-cand:nth-child(1)" }, { t: 4, at: ".rv-cand:nth-child(2)" }, { t: 6, at: '[data-use="$0.82"]' }, { t: 7, at: '[data-use="$0.82"]' }],
       clicks: [{ t: 6.6, at: '[data-use="$0.82"]' }],
@@ -124,16 +142,16 @@
         { t: 7.4, kicker: "Human-in-the-loop", line: "So I make the call. <b>Agents never guess.</b>" },
       ],
     },
-    // 9 — TIMELINE
+    // 10 — TIMELINE
     {
-      start: 66, screen: "timeline", params: {},
+      start: 74, screen: "timeline", params: {},
       cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 1.6, focus: '[data-card="MU"] .tl-bar', zoom: 1.5 }, { t: 6, focus: '[data-card="MU"] .tl-bar', zoom: 1.46 }],
       cursor: [{ t: 0, at: [500, 250] }, { t: 2, at: '[data-card="MU"] .tl-bar' }],
       captions: [{ t: 0, kicker: "Filing timeline", line: "Results drop on <b>no fixed date</b> — agents know when to start watching." }],
     },
-    // 10 — SETTINGS
+    // 11 — SETTINGS
     {
-      start: 73, screen: "settings", params: {},
+      start: 81, screen: "settings", params: {},
       cam: [{ t: 0, focus: ".usage", zoom: 1.2 }, { t: 2.2, focus: ".usage", zoom: 1.24 }, { t: 3, focus: ".route", zoom: 1.12 }, { t: 7, focus: ".route", zoom: 1.12 }],
       cursor: [{ t: 0, at: ".usage" }, { t: 3, at: ".route" }, { t: 6, at: ".route" }],
       captions: [
@@ -141,16 +159,16 @@
         { t: 3.4, kicker: "Model routing", line: "<b>Opus</b> where it counts; cheaper models for the routine polls." },
       ],
     },
-    // 11 — OUTRO
+    // 12 — OUTRO
     {
-      start: 80, screen: "watchlist", params: {},
+      start: 88, screen: "watchlist", params: {},
       title: { mode: "outro", html: `<div class="t-wrap"><div class="t-mark"></div><div class="t-word">AGENT&nbsp;<b>ORANGE</b></div><div class="t-tag">Fetches. Validates. Flags what needs you.<br>Your earnings desk, on autopilot.</div></div>` },
       cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 6, focus: "full", zoom: 1.02 }],
       cursor: [{ t: 0, at: [760, 470] }],
       captions: [],
     },
   ];
-  const DUR = 86;
+  const DUR = 94;
   SCENES.forEach((s, i) => { s.end = i < SCENES.length - 1 ? SCENES[i + 1].start : DUR; });
 
   // ---------- render state ----------
@@ -184,7 +202,7 @@
     if (key !== lastCapKey) {
       lastCapKey = key;
       if (active) {
-        capEl.innerHTML = `<span class="cap-kicker">${active.kicker}</span><div class="cap-line">${active.line}</div>`;
+        capEl.innerHTML = `<div class="cap-inner"><span class="cap-kicker">${active.kicker}</span><div class="cap-line">${active.line}</div></div>`;
         capEl.classList.remove("show"); void capEl.offsetWidth; capEl.classList.add("show");
       } else capEl.classList.remove("show");
     }
@@ -220,7 +238,7 @@
     const fa = appPoint(cs.a.focus), fb = appPoint(cs.b.focus);
     const focus = { x: lerp(fa.x, fb.x, cs.f), y: lerp(fa.y, fb.y, cs.f) };
     const zoom = lerp(cs.a.zoom, cs.b.zoom, cs.f);
-    const tx = 960 - focus.x * zoom, ty = 540 - focus.y * zoom;
+    const tx = 960 - focus.x * zoom, ty = CY - focus.y * zoom;
     camera.style.transform = `translate(${tx}px,${ty}px) scale(${zoom})`;
     lastZoom = zoom;
 
@@ -272,7 +290,7 @@
   });
 
   // chapters
-  const CHAPS = [["Watchlist", 5], ["Run agents", 25], ["Results", 32], ["Provenance", 45], ["Review", 55], ["Timeline", 66], ["Settings", 73]];
+  const CHAPS = [["Watchlist", 5], ["Run agents", 25], ["Notify", 31], ["Results", 42], ["Provenance", 55], ["Review", 64], ["Timeline", 74], ["Settings", 81]];
   chapters.innerHTML = CHAPS.map(([n, s]) => `<button class="chapter" data-start="${s}">${n}</button>`).join("");
   [...chapters.children].forEach((ch) => ch.addEventListener("click", () => { t = +ch.dataset.start; render(t); }));
 
