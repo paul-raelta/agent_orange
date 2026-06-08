@@ -1,5 +1,10 @@
 # Quickstart — running Agent Orange locally
 
+> **Just want to see what it does?** The product demo (~86s, autoplay + captions)
+> lives at <https://paul-raelta.github.io/agent_orange/> once Pages is enabled —
+> source in [`design/demo/`](design/demo/), publishable file at
+> [`docs/index.html`](docs/index.html).
+
 The whole thing is three processes: the **API** (FastAPI on :8000), the
 **UI** (Vite on :5173), and the **scheduler daemon** (APScheduler — optional;
 needed for automatic polling). All three run from the repo root.
