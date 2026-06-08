@@ -1,0 +1,134 @@
+/* Agent Orange — demo video chrome (frame, camera, cursor, captions, controls). */
+
+html, body {
+  margin: 0; height: 100%; background: #000; overflow: hidden;
+  font-family: var(--mono);
+}
+#fit {
+  position: fixed; inset: 0; overflow: hidden; background: #000;
+}
+/* the 16:9 video frame — centered via translate so it survives any wrapper */
+#frame {
+  width: 1920px; height: 1080px; position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(1); transform-origin: center center;
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #12161d 0%, #0a0c10 55%, #060709 100%);
+  overflow: hidden;
+}
+
+/* camera stage + camera */
+#cameraStage { position: absolute; inset: 0; overflow: hidden; }
+#camera {
+  position: absolute; left: 0; top: 0; width: 1440px; height: 900px;
+  transform-origin: 0 0; will-change: transform;
+}
+#appwin {
+  position: absolute; left: 0; top: 0; width: 1440px; height: 900px;
+  border-radius: 14px; overflow: hidden;
+  border: 1px solid #2a3340;
+  box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5);
+  background: var(--bg);
+}
+/* the real app shell, sized to the window */
+#appwin .app-shell { height: 900px; width: 1440px; }
+
+/* simulated cursor */
+#cursor {
+  position: absolute; left: 0; top: 0; width: 26px; height: 26px;
+  transform-origin: top left; pointer-events: none; z-index: 60;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,.55));
+}
+#cursor svg { display: block; width: 26px; height: 26px; }
+.click-ring {
+  position: absolute; left: 0; top: 0; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border: 2px solid var(--accent); border-radius: 50%; z-index: 59; pointer-events: none;
+  opacity: 0;
+}
+
+/* caption lower-third */
+#caption {
+  position: absolute; left: 64px; bottom: 70px; z-index: 70; max-width: 1100px;
+  opacity: 0; transition: opacity .35s ease, transform .35s ease; transform: translateY(8px);
+}
+#caption.show { opacity: 1; transform: none; }
+#caption .cap-kicker {
+  display: inline-block; font-size: 17px; letter-spacing: .22em; font-weight: 700;
+  color: var(--accent); margin-bottom: 12px; text-transform: uppercase;
+}
+#caption .cap-line {
+  font-family: var(--sans); font-size: 44px; font-weight: 600; color: #fff;
+  line-height: 1.2; letter-spacing: -0.01em; text-wrap: balance;
+  text-shadow: 0 2px 24px rgba(0,0,0,.7);
+}
+#caption .cap-line b { color: var(--accent); font-weight: 700; }
+
+/* title overlay (intro / outro) */
+#title {
+  position: absolute; inset: 0; z-index: 80; display: grid; place-items: center;
+  background:
+    radial-gradient(900px 600px at 50% 40%, #14181f 0%, #0a0c10 60%, #050608 100%);
+  opacity: 0; pointer-events: none;
+}
+#title .t-wrap { text-align: center; transform: translateY(0); }
+#title .t-mark {
+  width: 64px; height: 64px; background: var(--accent); transform: rotate(45deg);
+  margin: 0 auto 34px; box-shadow: 0 0 60px rgba(232,114,58,.6);
+}
+#title .t-word {
+  font-size: 76px; letter-spacing: .26em; font-weight: 700; color: #fff;
+  margin-left: .26em;
+}
+#title .t-word b { color: var(--accent); font-weight: 700; }
+#title .t-tag {
+  font-family: var(--sans); font-size: 26px; color: var(--text-2); margin-top: 22px;
+  letter-spacing: .01em;
+}
+#title .t-kicker {
+  font-size: 15px; letter-spacing: .3em; color: var(--accent); font-weight: 700;
+  margin-bottom: 26px; text-transform: uppercase;
+}
+
+/* timestamp chip */
+#tstamp {
+  position: absolute; right: 22px; top: 18px; z-index: 70;
+  font-size: 13px; letter-spacing: .12em; color: var(--text-3);
+  background: rgba(10,12,16,.6); border: 1px solid var(--line); border-radius: 6px;
+  padding: 5px 9px; backdrop-filter: blur(6px);
+}
+
+/* ===== Playback controls (outside the scaled frame) ===== */
+#controls {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 200;
+  display: flex; align-items: center; gap: 14px; width: min(880px, 92vw);
+  background: rgba(13,17,23,.92); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 16px; backdrop-filter: blur(10px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  font-family: var(--mono);
+}
+#playpause {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 9px;
+  background: var(--accent); color: #08090b; font-size: 15px; display: grid; place-items: center;
+}
+#playpause:hover { filter: brightness(1.08); }
+#scrub {
+  -webkit-appearance: none; appearance: none; flex: 1; height: 5px; border-radius: 3px;
+  background: var(--line); cursor: pointer; outline: none;
+}
+#scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; box-shadow: 0 0 0 4px rgba(232,114,58,.18);
+}
+#scrub::-moz-range-thumb {
+  width: 15px; height: 15px; border: none; border-radius: 50%; background: var(--accent);
+}
+#time { flex: 0 0 auto; font-size: 12px; color: var(--text-2); letter-spacing: .05em; min-width: 92px; text-align: right; }
+#chapters { display: flex; gap: 6px; flex: 0 0 auto; }
+.chapter {
+  font-size: 9.5px; letter-spacing: .08em; color: var(--text-3); padding: 4px 8px;
+  border-radius: 5px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer;
+  white-space: nowrap;
+}
+.chapter:hover { color: var(--text); border-color: var(--text-3); }
+.chapter.active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+
+@media (max-width: 720px) { #chapters { display: none; } }
