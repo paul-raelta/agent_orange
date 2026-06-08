@@ -23,7 +23,8 @@ from ao.logging import get_logger
 
 log = get_logger(__name__)
 
-EARNINGS_FORMS = {"10-Q", "10-K", "8-K"}
+PERIODIC_FORMS = {"10-Q", "10-K"}  # full income statement → reliable extraction
+EARNINGS_FORMS = PERIODIC_FORMS | {"8-K"}  # 8-K-2.02 is also valid but rare
 
 
 async def poll_company(
@@ -54,14 +55,19 @@ async def poll_company(
     dates = recent.get("filingDate", [])
     primary_docs = recent.get("primaryDocument", [])
 
-    # Find the most-recent earnings form (10-Q/10-K/8-K). 8-K filtering by
-    # item is best-effort: SEC publishes items in a different recent field
-    # array; we accept all 8-K and let extraction reject non-earnings ones.
-    target_idx: int | None = None
+    # Prefer 10-Q / 10-K (have the full income statement Opus needs) over 8-K
+    # (mostly material-event announcements; only the rare 8-K-2.02 is earnings).
+    # Iterate the recent feed once: pick the first 10-Q/10-K, falling back to
+    # an 8-K only if no quarterly/annual is in the window.
+    periodic_idx: int | None = None
+    eightk_idx: int | None = None
     for i, f in enumerate(forms):
-        if f in EARNINGS_FORMS:
-            target_idx = i
+        if f in PERIODIC_FORMS and periodic_idx is None:
+            periodic_idx = i
             break
+        if f == "8-K" and eightk_idx is None:
+            eightk_idx = i
+    target_idx = periodic_idx if periodic_idx is not None else eightk_idx
     if target_idx is None:
         async with run_log(session, user_id, company.ticker, stage="monitor",
                            company_id=company.id) as rec:

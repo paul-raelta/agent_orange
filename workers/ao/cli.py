@@ -302,8 +302,13 @@ def force_run(ticker: str) -> None:
                         source_label=loc.source_label, url=f.source_url or "",
                         page=loc.page, quote=loc.quote,
                     ))
+            # Flip the parent company status so the Watchlist card updates.
+            if verdict and verdict.conflict:
+                c.status = "review"
+            elif verdict and verdict.passed:
+                c.status = "validated"
             await session.commit()
-            typer.echo("✓ Persisted Result + Metric + Provenance")
+            typer.echo(f"✓ Persisted Result + Metric + Provenance · company status → {c.status}")
 
             if verdict and verdict.passed:
                 await dispatcher.dispatch(Event(
