@@ -277,6 +277,16 @@ async def serialize_review_queue(
 # ---------------------------------------------------------------------------
 
 
+def _fmt_activity_ts(ts: str) -> str:
+    """ISO 'YYYY-MM-DDTHH:MM:SS±00:00' → human 'Jun 08 21:23:39'.
+    Anything we can't parse passes through verbatim."""
+    try:
+        dt = datetime.fromisoformat(ts)
+        return dt.strftime("%b %d %H:%M:%S")
+    except (ValueError, TypeError):
+        return ts
+
+
 async def serialize_activity(
     session: AsyncSession, user_id: str, ticker: str | None = None
 ) -> list[s.ActivityRow]:
@@ -287,7 +297,7 @@ async def serialize_activity(
     rows = (await session.execute(stmt)).scalars().all()
     return [
         s.ActivityRow(
-            t=r.started_at, agent=r.agent,
+            t=_fmt_activity_ts(r.started_at), agent=r.agent,
             level=r.level if r.level in ("ok", "warn", "info") else "info",  # type: ignore[arg-type]
             tokens=r.input_tokens + r.output_tokens, cost=r.cost_usd, msg=r.message,
         ) for r in rows

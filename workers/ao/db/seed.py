@@ -367,20 +367,32 @@ def _seed_review_queue(session, user: m.User, sndk: m.Company) -> None:
 
 
 def _seed_activity(session, user: m.User, companies: dict[str, m.Company]) -> None:
+    # Backdate the seed activity relative to seed time so the demo rows are
+    # always in the recent past — otherwise any live RUN ALL AGENTS click writes
+    # rows that sort BELOW the seeded ones (text-DESC on ISO timestamps).
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+
+    def at(hours_ago: float) -> str:
+        return (now - timedelta(hours=hours_ago)).isoformat(timespec="seconds")
+
     rows = [
-        ("Jul 30 09:12:41", "SNDK", "warn", 41200, 0.62,
+        # SNDK Q4 — most recent demo activity (a few hours ago)
+        (at(7.0), "SNDK", "warn", 41200, 0.62,
          "Extracted Q4 figures — EPS conflict ($0.82 vs $0.79). Routed to Review Queue."),
-        ("Jul 30 09:11:58", "SNDK", "ok", 88400, 1.33,
+        (at(7.1), "SNDK", "ok", 88400, 1.33,
          "New 8-K detected on investors.sandisk.com. Downloaded Exhibit 99.1 (14 pp)."),
-        ("Jul 30 06:00:02", "SNDK", "info", 1800, 0.03,
+        (at(8.0), "SNDK", "info", 1800, 0.03,
          "Scheduled poll — checking IR + EDGAR for fiscal Q4 release."),
-        ("Jul 29 18:00:01", "MU", "info", 1750, 0.03,
+        # MU scheduled poll — a day ago
+        (at(24.0), "MU", "info", 1750, 0.03,
          "Scheduled poll — no new filing. Next expected window Sep 22 – Oct 06."),
-        ("May 27 02:14:09", "NVDA", "ok", 52600, 0.79,
+        # NVDA Q1 reporting — about 12 days ago (the narrative says "May 27")
+        (at(24.0 * 12), "NVDA", "ok", 52600, 0.79,
          "Validation PASSED — diluted EPS $2.39 corroborated in 3 locations. Recorded Q1 FY26."),
-        ("May 27 02:13:30", "NVDA", "ok", 96100, 1.44,
+        (at(24.0 * 12 + 0.01), "NVDA", "ok", 96100, 1.44,
          "Parsed 10-Q (38 pp) + press release. Extracted 5 metrics."),
-        ("May 27 02:12:11", "NVDA", "info", 2100, 0.03,
+        (at(24.0 * 12 + 0.02), "NVDA", "info", 2100, 0.03,
          "New 10-Q detected on investor.nvidia.com — triggered extraction run."),
     ]
     for t, ticker, level, tokens, cost, msg in rows:
