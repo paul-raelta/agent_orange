@@ -234,7 +234,11 @@
     if (key !== lastTitleKey) { titleEl.innerHTML = scene.title.html; lastTitleKey = key; }
     const dur = scene.end - scene.start;
     let op;
-    if (scene.title.mode === "intro" || scene.title.mode === "card") {
+    if (scene.title.mode === "intro") {
+      // opaque from the very first frame (no fade-in) so the UI never flashes
+      // behind it at the start; fade out only at the end.
+      op = lt > dur - 0.9 ? Math.max(0, (dur - lt) / 0.9) : 1;
+    } else if (scene.title.mode === "card") {
       op = lt < 0.5 ? lt / 0.5 : lt > dur - 0.9 ? Math.max(0, (dur - lt) / 0.9) : 1;
     } else {
       op = lt < 0.8 ? lt / 0.8 : 1;
