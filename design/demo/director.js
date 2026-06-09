@@ -314,14 +314,13 @@
   function fit() {
     const vw = window.innerWidth, vh = window.innerHeight;
     const portrait = vh > vw;
-    let EW, EH;
-    if (portrait) { rotWrap.classList.add("rotated"); EW = vh; EH = vw; }
-    else { rotWrap.classList.remove("rotated"); EW = vw; EH = vh; }
+    // Never rotate the content. In portrait we just letterbox the 16:9 video
+    // upright (smaller) and surface a hint; rotating the phone to landscape
+    // then fills the screen naturally.
+    rotWrap.classList.remove("rotated");
     if (rotHint) rotHint.style.display = portrait ? "flex" : "none";
-    // Reserve space for the controls bar along the short axis — proportional, so
-    // a short phone-landscape height doesn't lose most of the video to the bar.
-    const reserved = Math.max(52, Math.min(104, EH * 0.12));
-    const s = Math.min(EW / 1920, (EH - reserved) / 1080);
+    const reserved = Math.max(52, Math.min(104, vh * 0.10));
+    const s = Math.min(vw / 1920, (vh - reserved) / 1080);
     frame.style.transform = `translate(-50%, calc(-50% - ${reserved / 2}px)) scale(${s})`;
   }
   window.addEventListener("resize", fit);
