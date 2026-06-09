@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Agent Orange — Product Demo</title>
+<style>
+  :root { --accent: #e8723a; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { font-family: 'IBM Plex Mono', ui-monospace, monospace; color: #e4e8ee; }
+  #root, iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+  /* mobile video player */
+  .vidwrap { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; }
+  .vidwrap video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  /* tap-to-fullscreen poster overlay */
+  .playover {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px; cursor: pointer;
+    background:
+      linear-gradient(rgba(6,8,11,.35), rgba(6,8,11,.55)),
+      center / cover no-repeat url("poster.jpg");
+  }
+  .playover .pbtn {
+    width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(232,114,58,.95); color: #08090b; font-size: 34px; padding-left: 6px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 10px rgba(232,114,58,.18);
+  }
+  .playover .plabel { font-size: 13px; letter-spacing: .18em; color: #cdd4de; font-weight: 600; text-transform: uppercase; }
+  .playover .psub { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; color: #8b95a3; margin-top: -12px; }
+
+  .vfallback {
+    position: fixed; inset: 0; display: flex; flex-direction: column; gap: 14px;
+    align-items: center; justify-content: center; text-align: center; padding: 32px;
+    background: radial-gradient(900px 600px at 50% 40%, #14181f 0%, #0a0c10 60%, #050608 100%);
+  }
+  .vfallback .mk { width: 44px; height: 44px; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 40px rgba(232,114,58,.5); margin-bottom: 8px; }
+  .vfallback h1 { font-size: 16px; letter-spacing: .2em; font-weight: 700; }
+  .vfallback p { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; color: #929dac; max-width: 320px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var force = params.get("view"); // "video" forces player, "app" forces interactive
+  var root = document.getElementById("root");
+
+  function isMobile() {
+    var ua = navigator.userAgent || "";
+    var mobUA = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+    var iPadOS = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+    var coarseSmall = window.matchMedia("(pointer: coarse)").matches &&
+      Math.min(window.screen.width, window.screen.height) <= 900;
+    return mobUA || iPadOS || coarseSmall;
+  }
+
+  var goVideo = force === "video" || (force !== "app" && isMobile());
+
+  if (goVideo) {
+    root.innerHTML =
+      '<div class="vidwrap">' +
+        '<video id="v" poster="poster.jpg" playsinline webkit-playsinline preload="auto">' +
+          '<source src="demo.mp4" type="video/mp4">' +
+          '<source src="demo.webm" type="video/webm">' +
+        '</video>' +
+        '<div class="playover" id="po">' +
+          '<div class="pbtn">&#9654;</div>' +
+          '<div class="plabel">Watch the demo</div>' +
+          '<div class="psub">Plays full-screen &middot; rotate to landscape</div>' +
+        '</div>' +
+      '</div>';
+
+    var v = document.getElementById("v");
+    var po = document.getElementById("po");
+    var failed = false;
+
+    function fallback() {
+      if (failed) return; failed = true;
+      root.innerHTML =
+        '<div class="vfallback">' +
+          '<div class="mk"></div>' +
+          '<h1>AGENT&nbsp;ORANGE</h1>' +
+          '<p>The demo video is being prepared. Please check back shortly.</p>' +
+        '</div>';
+    }
+    v.addEventListener("error", fallback, true);
+    setTimeout(function () {
+      if (failed) return;
+      if (v.videoWidth || v.readyState >= 1) return;
+      if (v.networkState === 3 || v.error) fallback();
+    }, 6000);
+
+    // one tap → play and hand off to the OS fullscreen player (chromeless on iOS,
+    // and it rotates correctly). Falls back to inline controls if FS is unavailable.
+    function start() {
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+      if (v.webkitEnterFullscreen) {            // iPhone
+        var go = function () { try { v.webkitEnterFullscreen(); } catch (e) {} v.removeEventListener("loadedmetadata", go); };
+        if (v.readyState >= 1) go(); else v.addEventListener("loadedmetadata", go);
+      } else if (v.requestFullscreen) {          // Android / desktop
+        v.requestFullscreen().catch(function () {});
+      } else if (v.webkitRequestFullscreen) {
+        v.webkitRequestFullscreen();
+      }
+      v.controls = true;
+      if (po) po.style.display = "none";
+    }
+    po.addEventListener("click", start);
+    // when the iOS fullscreen player is dismissed, show the poster again
+    v.addEventListener("webkitendfullscreen", function () { v.pause(); if (po) po.style.display = "flex"; });
+    v.addEventListener("ended", function () { if (po) po.style.display = "flex"; });
+  } else {
+    var f = document.createElement("iframe");
+    f.src = "interactive.html";
+    f.setAttribute("allow", "fullscreen; autoplay");
+    f.setAttribute("title", "Agent Orange — interactive demo");
+    root.appendChild(f);
+  }
+})();
+</script>
+</body>
+</html>
