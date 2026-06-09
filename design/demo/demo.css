@@ -118,6 +118,25 @@ html, body {
   color: var(--text-3);
 }
 #title .t-contact a { color: var(--accent); text-decoration: none; }
+/* mobile intro card */
+#title .t-phoneglyph {
+  width: 58px; height: 96px; margin: 0 auto 34px; border-radius: 12px;
+  border: 2px solid var(--accent); position: relative;
+  box-shadow: 0 0 40px rgba(232,114,58,.35);
+}
+#title .t-phoneglyph span {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  width: 16px; height: 3px; border-radius: 2px; background: var(--accent); opacity: .8;
+}
+#title .t-phoneglyph::before {
+  content: ""; position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+  width: 18px; height: 3px; border-radius: 2px; background: rgba(232,114,58,.5);
+}
+#title .t-q {
+  font-family: var(--sans); font-size: 50px; font-weight: 600; color: #fff;
+  letter-spacing: -0.015em; line-height: 1.18; text-wrap: balance;
+}
+#title .t-q b { color: var(--accent); font-weight: 700; }
 #title .t-kicker {
   font-size: 15px; letter-spacing: .3em; color: var(--accent); font-weight: 700;
   margin-bottom: 26px; text-transform: uppercase;
@@ -184,6 +203,37 @@ html, body {
 }
 #rothint .rh-ico { color: var(--accent); font-size: 15px; animation: rh-spin 2.4s ease-in-out infinite; }
 @keyframes rh-spin { 0%,55% { transform: rotate(0); } 80%,100% { transform: rotate(90deg); } }
+
+/* ===== Mobile showcase scene: one hero phone running the real app ===== */
+.mstage {
+  width: 1440px; height: 900px; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(820px 560px at 28% 16%, #18202c 0%, transparent 60%),
+    radial-gradient(760px 620px at 82% 92%, #241a1a 0%, transparent 58%),
+    linear-gradient(140deg, #0a0d12 0%, #0c0f15 55%, #11100e 100%);
+}
+.mphone {
+  width: 398px; height: 832px; flex: 0 0 auto; position: relative;
+  background: #0c0c0e; border-radius: 50px; padding: 13px;
+  box-shadow: 0 44px 110px rgba(0,0,0,.62), inset 0 0 0 2px #2c2c30;
+}
+.mphone-screen {
+  width: 372px; height: 806px; /* 46 status + 760 app */
+  background: var(--bg); border-radius: 38px; overflow: hidden; position: relative;
+  display: flex; flex-direction: column;
+}
+.mphone-notch {
+  position: absolute; top: 13px; left: 50%; transform: translateX(-50%);
+  width: 150px; height: 30px; background: #0c0c0e; border-radius: 0 0 18px 18px; z-index: 6;
+}
+.mphone-status { flex: 0 0 46px; background: var(--panel); }
+.mphone-app { flex: 1; overflow: hidden; position: relative; }
+/* the real app-shell sits inside; its own container query handles mobile reflow */
+.mphone-app .app-shell { border: none; }
+/* hide the in-phone scrollbar so scripted scrolling looks native */
+.mphone-app .content { scrollbar-width: none; }
+.mphone-app .content::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 /* ===== Notifications scene: desk + macOS Mail + iPhone ===== */
 .desk {

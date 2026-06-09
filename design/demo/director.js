@@ -161,16 +161,62 @@
         { t: 3.4, kicker: "Model routing", line: "<b>Opus</b> where it counts; cheaper models for the routine polls." },
       ],
     },
-    // 12 — OUTRO
+    // 12 — MOBILE INTRO CARD (buffers the cut into the phone view)
     {
-      start: 88, screen: "watchlist", params: {},
+      start: 88, screen: "mobile", params: { view: "watchlist" },
+      title: { mode: "card", html: `<div class="t-wrap"><div class="t-phoneglyph"><span></span></div><div class="t-q">Need to get your results <b>on the go?</b></div></div>` },
+      cam: [{ t: 0, focus: ".mphone", zoom: 1.12 }, { t: 3, focus: ".mphone", zoom: 1.14 }],
+      cursor: [{ t: 0, at: [720, 470] }],
+      captions: [],
+    },
+    // 13 — MOBILE SHOWCASE (scroll + tap-through)
+    {
+      start: 91, screen: "mobile",
+      params: (lt) => (lt >= 5.4 ? { view: "company", tab: "validation" } : { view: "watchlist" }),
+      cam: [{ t: 0, focus: ".mphone-screen", zoom: 1.2 }, { t: 10, focus: ".mphone-screen", zoom: 1.2 }],
+      cursor: [
+        { t: 0, at: [720, 360] }, { t: 1.2, at: ".mphone .wl-grid" }, { t: 3.4, at: ".mphone .pf-strip" },
+        { t: 4.6, at: '.mphone [data-card="NVDA"]' }, { t: 5.4, at: ".mphone .co-hd" },
+        { t: 7, at: ".mphone .val-card" }, { t: 9.5, at: ".mphone .metric-list" },
+      ],
+      clicks: [{ t: 5.1, at: '.mphone [data-card="NVDA"]' }],
+      // scripted native-feeling scroll inside the phone's .content
+      tick: (lt) => {
+        const c = appmount.querySelector(".mphone-app .content");
+        if (!c) return;
+        const max = Math.max(0, c.scrollHeight - c.clientHeight);
+        let f = 0;
+        if (lt < 5.4) {
+          // watchlist: down (1→3), hold, back up (3.8→4.8)
+          if (lt < 1) f = 0;
+          else if (lt < 3) f = easeInOut((lt - 1) / 2) * 0.62;
+          else if (lt < 3.8) f = 0.62;
+          else if (lt < 4.8) f = 0.62 * (1 - easeInOut((lt - 3.8) / 1));
+          else f = 0;
+        } else {
+          // company: settle, then scroll down to the validation detail
+          const l2 = lt - 5.4;
+          if (l2 < 0.8) f = 0;
+          else if (l2 < 3.2) f = easeInOut((l2 - 0.8) / 2.4) * 0.7;
+          else f = 0.7;
+        }
+        c.scrollTop = f * max;
+      },
+      captions: [
+        { t: 0, pos: "tc", kicker: "On the go", line: "Your earnings desk goes <b>where you do.</b>" },
+        { t: 5.4, pos: "tc", kicker: "Tap in", line: "Open any company for the <b>full validated results.</b>" },
+      ],
+    },
+    // 14 — OUTRO
+    {
+      start: 101, screen: "watchlist", params: {},
       title: { mode: "outro", html: `<div class="t-wrap"><div class="t-mark"></div><div class="t-word">AGENT&nbsp;<b>ORANGE</b></div><div class="t-tag">Fetches. Validates. Flags what needs you.<br>Your earnings desk, on autopilot.</div><div class="t-live"><span class="t-stage t-l1">This isn't just a mockup…</span> <span class="t-stage t-l2">…it's working right now.</span></div><div class="t-stage t-contact">Contact <a href="mailto:paul.mcevoy@raelta.com">paul.mcevoy@raelta.com</a> for access.</div></div>` },
       cam: [{ t: 0, focus: "full", zoom: 1.05 }, { t: 12, focus: "full", zoom: 1.02 }],
       cursor: [{ t: 0, at: [760, 470] }],
       captions: [],
     },
   ];
-  const DUR = 100;
+  const DUR = 113;
   SCENES.forEach((s, i) => { s.end = i < SCENES.length - 1 ? SCENES[i + 1].start : DUR; });
 
   // ---------- render state ----------
@@ -188,7 +234,7 @@
     if (key !== lastTitleKey) { titleEl.innerHTML = scene.title.html; lastTitleKey = key; }
     const dur = scene.end - scene.start;
     let op;
-    if (scene.title.mode === "intro") {
+    if (scene.title.mode === "intro" || scene.title.mode === "card") {
       op = lt < 0.5 ? lt / 0.5 : lt > dur - 0.9 ? Math.max(0, (dur - lt) / 0.9) : 1;
     } else {
       op = lt < 0.8 ? lt / 0.8 : 1;
@@ -248,6 +294,8 @@
     const lt = t - scene.start;
 
     ensureScreen(scene, lt);
+    // scripted scroll / per-frame hook (runs before camera so follows scroll)
+    if (scene.tick) scene.tick(lt);
 
     // camera
     const cs = sampleTrack(scene.cam, lt);
@@ -263,7 +311,7 @@
     const ca = appPoint(us.a.at), cb = appPoint(us.b.at);
     const cp = { x: lerp(ca.x, cb.x, us.f), y: lerp(ca.y, cb.y, us.f) };
     cursor.style.transform = `translate(${cp.x}px,${cp.y}px) scale(${1 / zoom})`;
-    cursor.style.opacity = scene.title && scene.title.mode === "intro" && lt < 0.6 ? 0 : 1;
+    cursor.style.opacity = scene.title ? 0 : 1;
 
     applyClicks(scene, lt);
     applyCaption(scene, lt);
@@ -271,7 +319,7 @@
 
     // timestamp + chapters
     const mm = Math.floor(t / 60), ssec = Math.floor(t % 60);
-    tstamp.textContent = `${mm}:${String(ssec).padStart(2, "0")} / 1:26`;
+    tstamp.textContent = `${mm}:${String(ssec).padStart(2, "0")} / ${Math.floor(DUR / 60)}:${String(Math.floor(DUR % 60)).padStart(2, "0")}`;
     frame.dataset.screenLabel = `${mm}:${String(ssec).padStart(2, "0")}`;
     if (scene !== curScene) {
       curScene = scene;
@@ -306,7 +354,7 @@
   });
 
   // chapters
-  const CHAPS = [["Watchlist", 5], ["Run agents", 25], ["Notify", 31], ["Results", 42], ["Provenance", 55], ["Review", 64], ["Timeline", 74], ["Settings", 81]];
+  const CHAPS = [["Watchlist", 5], ["Run agents", 25], ["Notify", 31], ["Results", 42], ["Provenance", 55], ["Review", 64], ["Timeline", 74], ["Settings", 81], ["Mobile", 88]];
   chapters.innerHTML = CHAPS.map(([n, s]) => `<button class="chapter" data-start="${s}">${n}</button>`).join("");
   [...chapters.children].forEach((ch) => ch.addEventListener("click", () => { t = +ch.dataset.start; render(t); }));
 
