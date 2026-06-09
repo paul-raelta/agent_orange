@@ -194,6 +194,29 @@ html, body {
   #scrub { height: 4px; }
 }
 
+/* ===== Fullscreen button + touch-device chrome (orientation-independent) ===== */
+#fsbtn {
+  position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));
+  z-index: 300; display: none; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border-radius: 11px; font-size: 17px; line-height: 1;
+  background: rgba(13,17,23,.82); border: 1px solid var(--line); color: var(--text-2);
+  backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0,0,0,.4);
+}
+#fsbtn:hover { color: var(--text); }
+/* On touch devices: show the fullscreen button, hide the section-skip chapters in
+   ANY orientation (a landscape phone is wider than the px breakpoint), keep the
+   bar compact. */
+@media (pointer: coarse) {
+  #fsbtn { display: flex; }
+  #chapters { display: none !important; }
+  #controls { gap: 10px; padding: 6px 12px; bottom: max(10px, env(safe-area-inset-bottom)); border-radius: 10px; width: auto; }
+  #playpause { width: 30px; height: 30px; font-size: 13px; border-radius: 7px; }
+  #time { font-size: 10px; min-width: 64px; }
+  #scrub { height: 4px; }
+}
+/* hide the button itself while in fullscreen on platforms that support it? keep it
+   so users can exit — just swap the glyph via JS. */
+
 /* portrait rotate hint */
 #rothint {
   position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 300;

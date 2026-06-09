@@ -384,6 +384,28 @@
   }
   fit();
 
+  // ---------- fullscreen ----------
+  (function () {
+    var fsbtn = document.getElementById("fsbtn");
+    if (!fsbtn) return;
+    var el = document.documentElement;
+    var canFs = !!(el.requestFullscreen || el.webkitRequestFullscreen) ||
+      document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    // iOS Safari can't fullscreen a page (only <video>) — hide the dead button there.
+    if (!canFs) { fsbtn.style.display = "none"; return; }
+    function fsEl() { return document.fullscreenElement || document.webkitFullscreenElement; }
+    fsbtn.addEventListener("click", function () {
+      if (!fsEl()) {
+        (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      } else {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      }
+    });
+    function onChange() { fsbtn.textContent = fsEl() ? "⤡" : "⛶"; setTimeout(fit, 150); }
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+  })();
+
   // deterministic hook (testing / external control)
   window.__demo = { seek(v) { t = Math.max(0, Math.min(DUR, v)); render(t); scrub.value = t; timeEl.textContent = fmtTime(t) + " / " + fmtTime(DUR); }, pause() { setPlay(false); }, play() { setPlay(true); }, get t() { return t; } };
 
