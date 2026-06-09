@@ -4,6 +4,8 @@
    elements via live getBoundingClientRect (Screen-Studio-style damped focus). */
 (function () {
   const frame = document.getElementById("frame");
+  const rotWrap = document.getElementById("rot");
+  const rotHint = document.getElementById("rothint");
   const camera = document.getElementById("camera");
   const appmount = document.getElementById("appmount");
   const cursor = document.getElementById("cursor");
@@ -310,12 +312,20 @@
 
   // ---------- fit scaling ----------
   function fit() {
-    const reserved = 104; // viewport px reserved at the bottom for the controls bar
-    const s = Math.min(window.innerWidth / 1920, (window.innerHeight - reserved) / 1080);
-    // center the frame in the area ABOVE the controls (shift up by half the reserve)
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const portrait = vh > vw;
+    let EW, EH;
+    if (portrait) { rotWrap.classList.add("rotated"); EW = vh; EH = vw; }
+    else { rotWrap.classList.remove("rotated"); EW = vw; EH = vh; }
+    if (rotHint) rotHint.style.display = portrait ? "flex" : "none";
+    // Reserve space for the controls bar along the short axis — proportional, so
+    // a short phone-landscape height doesn't lose most of the video to the bar.
+    const reserved = Math.max(52, Math.min(104, EH * 0.12));
+    const s = Math.min(EW / 1920, (EH - reserved) / 1080);
     frame.style.transform = `translate(-50%, calc(-50% - ${reserved / 2}px)) scale(${s})`;
   }
   window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", fit);
   fit();
 
   // deterministic hook (testing / external control)

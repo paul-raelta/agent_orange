@@ -4,6 +4,15 @@ html, body {
   margin: 0; height: 100%; background: #000; overflow: hidden;
   font-family: var(--mono);
 }
+/* rotation wrapper: identity on desktop/landscape; in portrait it becomes a
+   landscape-shaped box rotated 90° to fill the screen. Its transform makes it
+   the containing block for the fixed #fit / #controls, which re-anchor to it. */
+#rot { position: fixed; inset: 0; }
+#rot.rotated {
+  inset: auto; top: 50%; left: 50%;
+  width: 100vh; height: 100vw;
+  transform: translate(-50%, -50%) rotate(90deg); transform-origin: center center;
+}
 #fit {
   position: fixed; inset: 0; overflow: hidden; background: #000;
 }
@@ -125,7 +134,7 @@ html, body {
 /* ===== Playback controls (outside the scaled frame) ===== */
 #controls {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 200;
-  display: flex; align-items: center; gap: 14px; width: min(880px, 92vw);
+  display: flex; align-items: center; gap: 14px; width: min(880px, 92%);
   background: rgba(13,17,23,.92); border: 1px solid var(--line); border-radius: 12px;
   padding: 10px 16px; backdrop-filter: blur(10px);
   box-shadow: 0 12px 40px rgba(0,0,0,.5);
@@ -157,7 +166,24 @@ html, body {
 .chapter:hover { color: var(--text); border-color: var(--text-3); }
 .chapter.active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
 
-@media (max-width: 720px) { #chapters { display: none; } }
+@media (max-width: 720px) {
+  #chapters { display: none; }
+  #controls { gap: 10px; padding: 7px 12px; bottom: 10px; border-radius: 10px; width: min(880px, 94%); }
+  #playpause { width: 30px; height: 30px; font-size: 13px; border-radius: 7px; }
+  #time { font-size: 10px; min-width: 70px; }
+  #scrub { height: 4px; }
+}
+
+/* portrait rotate hint */
+#rothint {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 300;
+  display: none; align-items: center; gap: 8px; white-space: nowrap;
+  background: rgba(13,17,23,.92); border: 1px solid var(--line); border-radius: 20px;
+  padding: 9px 16px; font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+  color: var(--text-2); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+}
+#rothint .rh-ico { color: var(--accent); font-size: 15px; animation: rh-spin 2.4s ease-in-out infinite; }
+@keyframes rh-spin { 0%,55% { transform: rotate(0); } 80%,100% { transform: rotate(90deg); } }
 
 /* ===== Notifications scene: desk + macOS Mail + iPhone ===== */
 .desk {
