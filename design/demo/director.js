@@ -360,19 +360,28 @@
 
   // ---------- fit scaling ----------
   function fit() {
-    const vw = window.innerWidth, vh = window.innerHeight;
+    // visualViewport is the reliable source on iOS (innerWidth/Height lag and
+    // include/exclude the URL bar inconsistently during rotation).
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
     const portrait = vh > vw;
-    // Never rotate the content. In portrait we just letterbox the 16:9 video
-    // upright (smaller) and surface a hint; rotating the phone to landscape
-    // then fills the screen naturally.
-    rotWrap.classList.remove("rotated");
+    // Portrait: letterbox the 16:9 demo upright (smaller) + show a rotate hint.
+    // Landscape: fill the screen. No content rotation — the page follows the device.
     if (rotHint) rotHint.style.display = portrait ? "flex" : "none";
     const reserved = Math.max(52, Math.min(104, vh * 0.10));
     const s = Math.min(vw / 1920, (vh - reserved) / 1080);
     frame.style.transform = `translate(-50%, calc(-50% - ${reserved / 2}px)) scale(${s})`;
   }
   window.addEventListener("resize", fit);
-  window.addEventListener("orientationchange", fit);
+  // iOS reports new dimensions late after a rotation — re-fit as it settles.
+  window.addEventListener("orientationchange", function () {
+    fit(); setTimeout(fit, 120); setTimeout(fit, 350); setTimeout(fit, 700);
+  });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fit);
+    window.visualViewport.addEventListener("scroll", fit);
+  }
   fit();
 
   // deterministic hook (testing / external control)
