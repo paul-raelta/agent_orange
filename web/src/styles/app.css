@@ -2174,3 +2174,156 @@ select.inp {
   color: var(--accent);
   border-color: var(--accent-line);
 }
+
+/* ===== Data sources panel ===== */
+.ds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ds-row {
+  display: grid;
+  grid-template-columns: 16px minmax(160px, 1.6fr) 90px minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.ds-row.disabled {
+  opacity: 0.55;
+}
+.ds-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.ds-dot.active {
+  background: var(--green);
+}
+.ds-dot.error {
+  background: var(--red);
+}
+.ds-dot.planned {
+  background: var(--text-3);
+}
+.ds-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ds-id b {
+  font-size: 12.5px;
+}
+.ds-id span {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--sans);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ds-kind {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  text-transform: uppercase;
+  text-align: center;
+}
+.ds-meta {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--sans);
+}
+.ds-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ds-toggle {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 4px 9px;
+  border-radius: 5px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ds-toggle.on {
+  color: var(--green);
+  border-color: var(--accent-line);
+}
+.ds-tinybtn {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-3);
+  cursor: pointer;
+}
+.ds-tinybtn:hover {
+  color: var(--text-1);
+  border-color: var(--text-3);
+}
+.ds-tinybtn.danger:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+.ds-add,
+.ds-suggest {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--panel-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ds-add-hd,
+.ds-suggest-hd {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+.ds-add-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 110px;
+  gap: 8px;
+}
+.ds-add-grid .inp {
+  font-size: 12px;
+}
+.ds-preview {
+  margin-top: 6px;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-2);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ds-preview.error {
+  color: var(--red);
+  border-color: var(--red);
+}
+.ds-suggest-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 80px;
+  gap: 8px;
+}

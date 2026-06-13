@@ -2,7 +2,13 @@
    from. Server state lives in the query cache; nothing else global is needed. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { NotificationPrefs, RoutingRule } from './types'
+import type {
+  AddDataSourceRequest,
+  CreateSourceSuggestionRequest,
+  NotificationPrefs,
+  PatchDataSourceRequest,
+  RoutingRule,
+} from './types'
 
 export const keys = {
   companies: ['companies'] as const,
@@ -16,6 +22,8 @@ export const keys = {
   news: (ticker: string) => ['news', ticker] as const,
   insider: (ticker: string) => ['insider', ticker] as const,
   notificationPrefs: ['settings', 'notifications'] as const,
+  dataSources: ['data-sources'] as const,
+  sourceSuggestions: ['source-suggestions'] as const,
 }
 
 export const useCompanies = () =>
@@ -102,6 +110,51 @@ export const useRunAll = () => {
 }
 
 export const useDiscover = () => useMutation({ mutationFn: api.discover })
+
+/* --- Data sources (financial-data feeds) --------------------------------- */
+
+export const useDataSources = () =>
+  useQuery({ queryKey: keys.dataSources, queryFn: api.getDataSources })
+
+export const useAddDataSource = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: AddDataSourceRequest) => api.addDataSource(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.dataSources }),
+  })
+}
+
+export const usePatchDataSource = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: PatchDataSourceRequest }) =>
+      api.patchDataSource(id, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.dataSources }),
+  })
+}
+
+export const useDeleteDataSource = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteDataSource(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.dataSources }),
+  })
+}
+
+export const useTestDataSource = () =>
+  useMutation({ mutationFn: (id: string) => api.testDataSource(id) })
+
+export const useSourceSuggestions = () =>
+  useQuery({ queryKey: keys.sourceSuggestions, queryFn: api.getSourceSuggestions })
+
+export const useSuggestSource = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreateSourceSuggestionRequest) =>
+      api.createSourceSuggestion(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.sourceSuggestions }),
+  })
+}
 
 export const useWipe = () => {
   const qc = useQueryClient()

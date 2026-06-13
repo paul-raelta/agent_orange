@@ -6,16 +6,22 @@
    sets it explicitly. */
 import type {
   ActivityRow,
+  AddDataSourceRequest,
   Company,
+  CreateSourceSuggestionRequest,
+  DataSource,
   DiscoveryStatus,
   NewsItem,
   InsiderTx,
   NotificationPrefs,
+  PatchDataSourceRequest,
   PortfolioTotals,
   Provider,
   ReviewItem,
   RoutingRule,
   RunResponse,
+  SourceSuggestion,
+  TestDataSourceResult,
   Usage,
 } from './types'
 
@@ -34,7 +40,9 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>
 }
 
-async function send<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<T> {
+async function send<T>(
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown,
+): Promise<T> {
   const r = await fetch(API_BASE + path, {
     method,
     credentials: 'omit',
@@ -77,6 +85,25 @@ export const api = {
 
   runAll: () => send<RunResponse>('POST', '/run'),
   runOne: (ticker: string) => send<RunResponse>('POST', `/companies/${ticker}/run`),
+
+  // Data sources (the financial feeds the agents fetch from)
+  getDataSources: () => get<DataSource[]>('/data-sources'),
+  addDataSource: (body: AddDataSourceRequest) =>
+    send<DataSource>('POST', '/data-sources', body),
+  patchDataSource: (id: string, body: PatchDataSourceRequest) =>
+    send<DataSource>('PATCH', `/data-sources/${id}`, body),
+  deleteDataSource: async (id: string) => {
+    const r = await fetch(API_BASE + `/data-sources/${id}`, {
+      method: 'DELETE', credentials: 'omit',
+    })
+    if (!r.ok) throw new Error(`DELETE /data-sources/${id} failed: ${r.status}`)
+  },
+  testDataSource: (id: string) =>
+    send<TestDataSourceResult>('POST', `/data-sources/${id}/test`),
+
+  getSourceSuggestions: () => get<SourceSuggestion[]>('/source-suggestions'),
+  createSourceSuggestion: (body: CreateSourceSuggestionRequest) =>
+    send<SourceSuggestion>('POST', '/source-suggestions', body),
 
   // Admin — wipes fetched data (filings, results, metrics, activity, prices,
   // news, insider, usage). Keeps companies + their config. The Review screen

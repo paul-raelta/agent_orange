@@ -368,3 +368,53 @@ class Setting(Base):
     default_validation_rule: Mapped[str] = mapped_column(
         String, default="Cross-reference EPS in ≥2 locations"
     )
+
+
+# --- financial data sources (agent fetchers) --------------------------------
+class DataSource(Base):
+    """A financial-data feed the agents fetch from. Built-ins (sec_edgar,
+    finnhub_*, ir_fetcher) are seeded per user at boot; user-origin rows are
+    added through POST /data-sources and resolve to the generic HTTP fetcher.
+
+    Disabling a row stops new fetches from that source but does NOT rewrite
+    historical provenance — past metrics keep their recorded source labels.
+    """
+    __tablename__ = "data_sources"
+    __table_args__ = (
+        UniqueConstraint("user_id", "source_id", name="uq_data_source_user_id"),
+        Index("ix_data_source_user_kind_enabled", "user_id", "kind", "enabled"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    source_id: Mapped[str] = mapped_column(String, nullable=False)  # sec_edgar | finnhub_* | ir_fetcher | usr_<uuid>
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)  # filings|quote|news|insider|ir
+    origin: Mapped[str] = mapped_column(String, default="builtin")  # builtin|user
+    status: Mapped[str] = mapped_column(String, default="active")  # active|planned|error
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    base_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    auth_label: Mapped[str] = mapped_column(String, default="")
+    auth_secret_ref: Mapped[str | None] = mapped_column(String, nullable=True)  # env-var NAME, never the secret
+    config_json: Mapped[str] = mapped_column(Text, default="{}")
+    last_ok_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+
+
+class SourceSuggestion(Base):
+    """User-submitted 'please fetch from X' record. Table-only — no email/notify.
+    Browse via GET /api/v1/source-suggestions when you want to triage."""
+    __tablename__ = "source_suggestions"
+    __table_args__ = (Index("ix_source_sug_user_status", "user_id", "status"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    ticker: Mapped[str | None] = mapped_column(String, nullable=True)
+    url: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str | None] = mapped_column(String, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String, default="submitted")  # submitted|reviewing|live|rejected
+    submitted_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+    reviewed_at: Mapped[str | None] = mapped_column(String, nullable=True)

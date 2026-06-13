@@ -4,19 +4,32 @@ import { useEffect, useState } from 'react'
 import { Btn, Panel } from '../components/primitives'
 import { Loading } from '../components/Loading'
 import {
+  useAddDataSource,
+  useDataSources,
+  useDeleteDataSource,
   useNotificationPrefs,
+  usePatchDataSource,
   useProviders,
   usePutRouting,
   useRouting,
   useSaveNotificationPrefs,
+  useSuggestSource,
+  useTestDataSource,
   useUsage,
   useWipe,
 } from '../hooks'
 import { useShell } from '../layout/shellContext'
 import type { RunFeedback } from '../layout/shellContext'
-import type { NotificationPrefs } from '../types'
+import type {
+  DataSource,
+  DataSourceKind,
+  NotificationPrefs,
+  TestDataSourceResult,
+} from '../types'
 
 const MODELS = ['Claude Haiku 4', 'Claude Sonnet 4', 'Claude Opus 4']
+
+const DATA_SOURCE_KINDS: DataSourceKind[] = ['filings', 'quote', 'news', 'insider', 'ir']
 
 export function Settings() {
   const { data: usage } = useUsage()
@@ -110,6 +123,8 @@ export function Settings() {
           ))}
         </div>
       </Panel>
+
+      <DataSourcesPanel />
 
       <Panel
         title="MODEL ROUTING — per task"
@@ -340,5 +355,259 @@ export function Settings() {
         </div>
       </Panel>
     </div>
+  )
+}
+
+/* ----------------------------------------------------------------------- */
+/* DATA SOURCES — the financial-data feeds the agents fetch from.          */
+/* Sibling of the LLM PROVIDERS panel above; lists built-ins + user-added, */
+/* lets you toggle, add a custom HTTPS URL, or suggest one we should add.  */
+/* ----------------------------------------------------------------------- */
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return '—'
+  const t = Date.parse(iso)
+  if (Number.isNaN(t)) return iso
+  const delta = Date.now() - t
+  if (delta < 60_000) return 'just now'
+  if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`
+  if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`
+  return `${Math.floor(delta / 86_400_000)}d ago`
+}
+
+function DataSourcesPanel() {
+  const { data: sources } = useDataSources()
+  const patch = usePatchDataSource()
+  const del = useDeleteDataSource()
+  const test = useTestDataSource()
+  const add = useAddDataSource()
+  const suggest = useSuggestSource()
+
+  const [adding, setAdding] = useState(false)
+  const [draftName, setDraftName] = useState('')
+  const [draftUrl, setDraftUrl] = useState('')
+  const [draftKind, setDraftKind] = useState<DataSourceKind>('news')
+  const [addPreview, setAddPreview] = useState<TestDataSourceResult | null>(null)
+
+  const [suggesting, setSuggesting] = useState(false)
+  const [sUrl, setSUrl] = useState('')
+  const [sNote, setSNote] = useState('')
+  const [suggestSaved, setSuggestSaved] = useState(false)
+
+  const [testingId, setTestingId] = useState<string | null>(null)
+  const [testResult, setTestResult] = useState<Record<string, TestDataSourceResult>>({})
+
+  if (!sources) return null
+
+  const resetAdd = () => {
+    setAdding(false)
+    setDraftName('')
+    setDraftUrl('')
+    setDraftKind('news')
+    setAddPreview(null)
+  }
+  const resetSuggest = () => {
+    setSuggesting(false)
+    setSUrl('')
+    setSNote('')
+    setSuggestSaved(false)
+  }
+
+  const runTest = async (id: string) => {
+    setTestingId(id)
+    try {
+      const result = await test.mutateAsync(id)
+      setTestResult((prev) => ({ ...prev, [id]: result }))
+    } finally {
+      setTestingId(null)
+    }
+  }
+
+  return (
+    <Panel
+      title="DATA SOURCES"
+      right={<span className="hint">where the agents fetch financial data from</span>}
+    >
+      <div className="ds-list">
+        {sources.map((src: DataSource) => {
+          const dotClass =
+            !src.enabled ? '' :
+            src.status === 'error' ? 'error' :
+            src.status === 'planned' ? 'planned' : 'active'
+          const last = src.lastError
+            ? `error · ${src.lastError.slice(0, 60)}`
+            : `last ok ${relativeTime(src.lastOkAt)}`
+          return (
+            <div key={src.id} className={'ds-row' + (src.enabled ? '' : ' disabled')}>
+              <span className={'ds-dot ' + dotClass} />
+              <div className="ds-id">
+                <b>{src.name}</b>
+                <span>
+                  {src.authLabel}
+                  {src.origin === 'user' && src.baseUrl ? ` · ${src.baseUrl}` : ''}
+                </span>
+              </div>
+              <span className="ds-kind">{src.kind}</span>
+              <span className="ds-meta">{last}</span>
+              <div className="ds-actions">
+                <button
+                  className={'ds-toggle' + (src.enabled ? ' on' : '')}
+                  onClick={() =>
+                    patch.mutate({ id: src.id, body: { enabled: !src.enabled } })
+                  }
+                  disabled={patch.isPending}
+                >
+                  {src.enabled ? '● ENABLED' : '○ DISABLED'}
+                </button>
+                {src.origin === 'user' && (
+                  <>
+                    <button
+                      className="ds-tinybtn"
+                      onClick={() => runTest(src.id)}
+                      disabled={testingId === src.id}
+                    >
+                      {testingId === src.id ? '…' : 'TEST'}
+                    </button>
+                    <button
+                      className="ds-tinybtn danger"
+                      onClick={() => del.mutate(src.id)}
+                      disabled={del.isPending}
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+              {testResult[src.id] && (
+                <div
+                  className={'ds-preview' + (testResult[src.id].ok ? '' : ' error')}
+                  style={{ gridColumn: '1 / -1' }}
+                >
+                  {testResult[src.id].ok
+                    ? `HTTP ${testResult[src.id].status} · ${
+                        testResult[src.id].contentType || 'no content-type'
+                      }\n\n${testResult[src.id].preview}`
+                    : `Failed: ${testResult[src.id].error}`}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {!adding ? (
+        <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Btn kind="primary" sm icon="+" onClick={() => setAdding(true)}>
+            ADD CUSTOM SOURCE
+          </Btn>
+          <Btn kind="ghost" sm onClick={() => setSuggesting(true)}>
+            SUGGEST A SOURCE
+          </Btn>
+        </div>
+      ) : (
+        <div className="ds-add">
+          <span className="ds-add-hd">ADD CUSTOM HTTPS SOURCE</span>
+          <div className="ds-add-grid">
+            <input
+              className="inp"
+              placeholder="Display name"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+            />
+            <input
+              className="inp"
+              placeholder="https://…"
+              value={draftUrl}
+              onChange={(e) => setDraftUrl(e.target.value)}
+            />
+            <select
+              className="inp"
+              value={draftKind}
+              onChange={(e) => setDraftKind(e.target.value as DataSourceKind)}
+            >
+              {DATA_SOURCE_KINDS.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--text-3)', margin: 0, fontFamily: 'var(--sans)' }}>
+            Only <code>https://</code> URLs. We block private / loopback IPs and cap responses
+            at 5 MB. The fetcher is generic — it surfaces the response so an agent can read it,
+            but doesn't parse it into structured data yet.
+          </p>
+          {addPreview && (
+            <div className={'ds-preview' + (addPreview.ok ? '' : ' error')}>
+              {addPreview.ok
+                ? `HTTP ${addPreview.status} · ${addPreview.contentType || 'no content-type'}\n\n${addPreview.preview}`
+                : `Failed: ${addPreview.error}`}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Btn
+              kind="primary"
+              sm
+              onClick={async () => {
+                const created = await add.mutateAsync({
+                  name: draftName || 'Custom source',
+                  url: draftUrl,
+                  kind: draftKind,
+                })
+                resetAdd()
+                // Auto-test once after add so the user sees green/red immediately.
+                runTest(created.id)
+              }}
+              disabled={!draftUrl.startsWith('https://') || !draftName.trim() || add.isPending}
+            >
+              {add.isPending ? 'SAVING…' : 'SAVE SOURCE'}
+            </Btn>
+            <Btn kind="ghost" sm onClick={resetAdd}>Cancel</Btn>
+          </div>
+        </div>
+      )}
+
+      {suggesting && (
+        <div className="ds-suggest">
+          <span className="ds-suggest-hd">SUGGEST A SOURCE WE DON'T SUPPORT YET</span>
+          <div className="ds-suggest-row">
+            <input
+              className="inp"
+              placeholder="https://example.com/feed"
+              value={sUrl}
+              onChange={(e) => setSUrl(e.target.value)}
+            />
+            <input
+              className="inp"
+              placeholder="one-line why (optional)"
+              value={sNote}
+              onChange={(e) => setSNote(e.target.value)}
+            />
+            <Btn
+              kind="primary"
+              sm
+              onClick={async () => {
+                await suggest.mutateAsync({ url: sUrl, note: sNote })
+                setSuggestSaved(true)
+                setSUrl('')
+                setSNote('')
+              }}
+              disabled={!sUrl.trim() || suggest.isPending}
+            >
+              {suggest.isPending ? '…' : 'SUBMIT'}
+            </Btn>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--sans)' }}>
+              Goes into the backlog table — nothing has to work, this is a wishlist signal.
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {suggestSaved && (
+                <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ Submitted</span>
+              )}
+              <Btn kind="ghost" sm onClick={resetSuggest}>Done</Btn>
+            </div>
+          </div>
+        </div>
+      )}
+    </Panel>
   )
 }

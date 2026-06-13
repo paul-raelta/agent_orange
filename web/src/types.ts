@@ -165,6 +165,67 @@ export type Provider = {
 
 export type RoutingRule = { task: string; desc: string; model: string }
 
+/* Financial data sources the agents fetch from. Built-ins are seeded per
+   user (sec_edgar, finnhub_*, ir_fetcher); user-origin rows are added via the
+   Settings panel and resolve to a generic HTTPS fetcher. */
+export type DataSourceKind = 'filings' | 'quote' | 'news' | 'insider' | 'ir'
+export type DataSourceStatus = 'active' | 'planned' | 'error'
+export type DataSourceOrigin = 'builtin' | 'user'
+
+export type DataSource = {
+  id: string
+  sourceId: string
+  name: string
+  kind: DataSourceKind
+  origin: DataSourceOrigin
+  status: DataSourceStatus
+  enabled: boolean
+  baseUrl: string | null
+  authLabel: string
+  authSecretRef: string | null
+  lastOkAt: string | null
+  lastError: string | null
+}
+
+export type AddDataSourceRequest = {
+  name: string
+  url: string
+  kind: DataSourceKind
+  note?: string
+}
+
+export type PatchDataSourceRequest = {
+  enabled?: boolean
+  baseUrl?: string
+  name?: string
+}
+
+export type TestDataSourceResult = {
+  ok: boolean
+  status: number | null
+  contentType: string
+  preview: string
+  error: string | null
+}
+
+export type SourceSuggestion = {
+  id: string
+  ticker: string | null
+  url: string
+  kind: string | null
+  note: string
+  status: 'submitted' | 'reviewing' | 'live' | 'rejected'
+  submittedAt: string
+  reviewedAt: string | null
+}
+
+export type CreateSourceSuggestionRequest = {
+  url: string
+  ticker?: string
+  kind?: string
+  note?: string
+}
+
 export type AOData = {
   companies: Company[]
   reviewQueue: ReviewItem[]

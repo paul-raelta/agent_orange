@@ -16,6 +16,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ao.agents import source_registry
 from ao.agents.runlog import run_log
 from ao.db import models as m
 from ao.integrations import edgar_client
@@ -41,13 +42,32 @@ async def poll_company(
             rec.set(level="warn", message="No CIK on file — discovery hasn't run yet.")
         return None
 
+    # Ask the registry for enabled 'filings' sources. Built-in sec_edgar is
+    # the only fetcher that returns the EDGAR submissions shape today, so we
+    # use whichever resolved fetcher is for source_id 'sec_edgar'. A future
+    # enhancement could blend multiple filing-source results; v1 keeps it
+    # simple — disabled sec_edgar means we skip the poll entirely.
+    filing_sources = await source_registry.enabled_for(
+        session, user_id, kind="filings",
+    )
+    edgar = next((s for s in filing_sources if s.source_id == "sec_edgar"), None)
+    if edgar is None:
+        async with run_log(session, user_id, company.ticker, stage="monitor",
+                           company_id=company.id) as rec:
+            rec.set(level="info",
+                    message="Skipped: SEC EDGAR source is disabled in Settings → Data sources.")
+        return None
     try:
-        data = await edgar_client.submissions(company.cik)
+        data = await edgar.fetcher(cik=company.cik)
     except Exception as exc:  # noqa: BLE001
+        await source_registry.record_fetch(
+            session, user_id, "sec_edgar", ok=False, error=str(exc),
+        )
         async with run_log(session, user_id, company.ticker, stage="monitor",
                            company_id=company.id) as rec:
             rec.set(level="error", message=f"EDGAR fetch failed: {exc}")
         return None
+    await source_registry.record_fetch(session, user_id, "sec_edgar", ok=True)
 
     recent = data.get("filings", {}).get("recent", {})
     forms = recent.get("form", [])

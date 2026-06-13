@@ -227,6 +227,72 @@ class RoutingRule(WireBase):
 
 
 # ---------------------------------------------------------------------------
+# Data sources — the financial-data feeds the agents fetch from
+# ---------------------------------------------------------------------------
+
+DataSourceKind = Literal["filings", "quote", "news", "insider", "ir"]
+DataSourceStatus = Literal["active", "planned", "error"]
+DataSourceOrigin = Literal["builtin", "user"]
+
+
+class DataSource(WireBase):
+    id: str
+    sourceId: str
+    name: str
+    kind: DataSourceKind
+    origin: DataSourceOrigin
+    status: DataSourceStatus
+    enabled: bool
+    baseUrl: str | None = None
+    authLabel: str
+    authSecretRef: str | None = None
+    lastOkAt: str | None = None
+    lastError: str | None = None
+
+
+class AddDataSourceRequest(WireBase):
+    name: str
+    url: str
+    kind: DataSourceKind
+    note: str | None = None
+
+
+class PatchDataSourceRequest(WireBase):
+    enabled: bool | None = None
+    baseUrl: str | None = None
+    name: str | None = None
+
+
+class TestDataSourceResult(WireBase):
+    ok: bool
+    status: int | None = None
+    contentType: str
+    preview: str
+    error: str | None = None
+
+
+SourceSuggestionStatus = Literal["submitted", "reviewing", "live", "rejected"]
+
+
+class SourceSuggestion(WireBase):
+    id: str
+    ticker: str | None = None
+    url: str
+    kind: str | None = None
+    note: str
+    status: SourceSuggestionStatus
+    submittedAt: str
+    reviewedAt: str | None = None
+
+
+class CreateSourceSuggestionRequest(WireBase):
+    url: str
+    ticker: str | None = None
+    kind: str | None = None
+    note: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Request bodies
 # ---------------------------------------------------------------------------
 

@@ -365,6 +365,44 @@ async def serialize_routing(session: AsyncSession, user_id: str) -> list[s.Routi
     return [s.RoutingRule(task=r.task, desc=r.desc, model=r.model) for r in rows]
 
 
+def serialize_data_source(row: m.DataSource) -> s.DataSource:
+    return s.DataSource(
+        id=row.id, sourceId=row.source_id, name=row.name,
+        kind=row.kind, origin=row.origin, status=row.status,
+        enabled=row.enabled, baseUrl=row.base_url,
+        authLabel=row.auth_label, authSecretRef=row.auth_secret_ref,
+        lastOkAt=row.last_ok_at, lastError=row.last_error,
+    )
+
+
+async def serialize_data_sources(
+    session: AsyncSession, user_id: str,
+) -> list[s.DataSource]:
+    rows = (await session.execute(
+        select(m.DataSource).where(m.DataSource.user_id == user_id)
+        .order_by(m.DataSource.origin.desc(), m.DataSource.kind, m.DataSource.name)
+    )).scalars().all()
+    return [serialize_data_source(r) for r in rows]
+
+
+def serialize_source_suggestion(row: m.SourceSuggestion) -> s.SourceSuggestion:
+    return s.SourceSuggestion(
+        id=row.id, ticker=row.ticker, url=row.url, kind=row.kind,
+        note=row.note, status=row.status,
+        submittedAt=row.submitted_at, reviewedAt=row.reviewed_at,
+    )
+
+
+async def serialize_source_suggestions(
+    session: AsyncSession, user_id: str,
+) -> list[s.SourceSuggestion]:
+    rows = (await session.execute(
+        select(m.SourceSuggestion).where(m.SourceSuggestion.user_id == user_id)
+        .order_by(m.SourceSuggestion.submitted_at.desc())
+    )).scalars().all()
+    return [serialize_source_suggestion(r) for r in rows]
+
+
 async def serialize_notification_prefs(
     session: AsyncSession, user_id: str
 ) -> s.NotificationPrefs:

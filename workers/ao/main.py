@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
         routes_review,
         routes_run,
         routes_settings,
+        routes_sources,
         routes_usage,
     )
 
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_providers.router, prefix=prefix)
     app.include_router(routes_run.router, prefix=prefix)
     app.include_router(routes_settings.router, prefix=prefix)
+    app.include_router(routes_sources.router, prefix=prefix)
     app.include_router(routes_news.router, prefix=prefix)
     app.include_router(routes_portfolio.router, prefix=prefix)
     app.include_router(routes_events.router, prefix=prefix)

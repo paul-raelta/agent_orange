@@ -92,6 +92,8 @@ async def _wipe(session) -> None:
         m.UsageDaily,
         m.RoutingRule,
         m.Provider,
+        m.DataSource,
+        m.SourceSuggestion,
         m.NotificationPref,
         m.Setting,
         m.Company,
@@ -405,6 +407,37 @@ def _seed_activity(session, user: m.User, companies: dict[str, m.Company]) -> No
         ))
 
 
+def _seed_data_sources(session, user: m.User) -> None:
+    """Seed the built-in financial-data sources. User can disable/configure
+    them on Settings; they're recreated on a fresh seed."""
+    has_finnhub = bool(get_settings().finnhub_api_key)
+    finnhub_auth = "API key set" if has_finnhub else "Missing FINNHUB_API_KEY"
+    finnhub_status = "active" if has_finnhub else "planned"
+    builtins = [
+        dict(source_id="sec_edgar", name="SEC EDGAR", kind="filings",
+             auth_label="No key required", auth_secret_ref=None,
+             status="active", base_url="https://data.sec.gov"),
+        dict(source_id="finnhub_quote", name="Finnhub — quote", kind="quote",
+             auth_label=finnhub_auth, auth_secret_ref="FINNHUB_API_KEY",
+             status=finnhub_status, base_url="https://finnhub.io/api/v1"),
+        dict(source_id="finnhub_news", name="Finnhub — company news", kind="news",
+             auth_label=finnhub_auth, auth_secret_ref="FINNHUB_API_KEY",
+             status=finnhub_status, base_url="https://finnhub.io/api/v1"),
+        dict(source_id="finnhub_insider", name="Finnhub — insider transactions",
+             kind="insider",
+             auth_label=finnhub_auth, auth_secret_ref="FINNHUB_API_KEY",
+             status=finnhub_status, base_url="https://finnhub.io/api/v1"),
+        dict(source_id="ir_fetcher", name="Investor-relations site fetcher",
+             kind="ir",
+             auth_label="No key required", auth_secret_ref=None,
+             status="active", base_url=None),
+    ]
+    for b in builtins:
+        session.add(m.DataSource(
+            user_id=user.id, origin="builtin", enabled=True, **b,
+        ))
+
+
 def _seed_routing_providers(session, user: m.User) -> None:
     settings = get_settings()
     session.add_all([
@@ -489,6 +522,7 @@ async def seed_all(only_ticker: str | None = None) -> None:
             _seed_review_queue(session, user, companies["SNDK"])
         _seed_activity(session, user, companies)
         _seed_routing_providers(session, user)
+        _seed_data_sources(session, user)
         _seed_usage(session, user)
 
         await session.commit()

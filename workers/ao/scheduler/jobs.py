@@ -9,11 +9,11 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
+from ao.agents import source_registry
 from ao.agents.pipeline import run_one
 from ao.config import get_settings
 from ao.db import models as m
 from ao.db.engine import get_sessionmaker
-from ao.integrations import finnhub_client
 from ao.logging import get_logger
 from ao.scheduler.cadence import compute_next_window
 
@@ -37,17 +37,32 @@ async def refresh_prices() -> None:
     user_id = get_settings().user_id
     Session = get_sessionmaker()
     async with Session() as session:
+        sources = await source_registry.enabled_for(session, user_id, kind="quote")
+        if not sources:
+            log.info("scheduler.prices_skipped_no_sources")
+            return
         rows = (await session.execute(
             select(m.Company).where(m.Company.user_id == user_id)
         )).scalars().all()
         for c in rows:
-            q = await finnhub_client.quote(c.ticker)
-            if not q or "c" not in q:
-                continue
-            session.add(m.Price(
-                id=uuid4().hex, company_id=c.id, ts=_now_iso(),
-                price=float(q["c"]), day_change=float(q.get("dp", 0.0)),
-            ))
+            for src in sources:
+                try:
+                    q = await src.fetcher(ticker=c.ticker)
+                except Exception as exc:  # noqa: BLE001
+                    await source_registry.record_fetch(
+                        session, user_id, src.source_id, ok=False, error=str(exc),
+                    )
+                    continue
+                if not q or "c" not in q:
+                    continue
+                session.add(m.Price(
+                    id=uuid4().hex, company_id=c.id, ts=_now_iso(),
+                    price=float(q["c"]), day_change=float(q.get("dp", 0.0)),
+                ))
+                await source_registry.record_fetch(
+                    session, user_id, src.source_id, ok=True,
+                )
+                break  # first source with a good answer wins
         await session.commit()
     log.info("scheduler.prices_refreshed", count=len(rows))
 
@@ -57,12 +72,34 @@ async def refresh_news_insider() -> None:
     user_id = get_settings().user_id
     Session = get_sessionmaker()
     async with Session() as session:
+        news_sources = await source_registry.enabled_for(
+            session, user_id, kind="news",
+        )
+        insider_sources = await source_registry.enabled_for(
+            session, user_id, kind="insider",
+        )
+        if not news_sources and not insider_sources:
+            log.info("scheduler.news_insider_skipped_no_sources")
+            return
         rows = (await session.execute(
             select(m.Company).where(m.Company.user_id == user_id)
         )).scalars().all()
         for c in rows:
             # News
-            news = await finnhub_client.company_news(c.ticker, days=30)
+            news: list[dict] = []
+            for src in news_sources:
+                try:
+                    news = await src.fetcher(ticker=c.ticker, days=30) or []
+                except Exception as exc:  # noqa: BLE001
+                    await source_registry.record_fetch(
+                        session, user_id, src.source_id, ok=False, error=str(exc),
+                    )
+                    continue
+                await source_registry.record_fetch(
+                    session, user_id, src.source_id, ok=True,
+                )
+                if news:
+                    break
             seen_urls = {
                 u for (u,) in (await session.execute(
                     select(m.News.url).where(m.News.company_id == c.id)
@@ -82,7 +119,20 @@ async def refresh_news_insider() -> None:
                     url=url, source=n.get("source", ""),
                 ))
             # Insider
-            insider = await finnhub_client.insider_transactions(c.ticker)
+            insider: list[dict] = []
+            for src in insider_sources:
+                try:
+                    insider = await src.fetcher(ticker=c.ticker) or []
+                except Exception as exc:  # noqa: BLE001
+                    await source_registry.record_fetch(
+                        session, user_id, src.source_id, ok=False, error=str(exc),
+                    )
+                    continue
+                await source_registry.record_fetch(
+                    session, user_id, src.source_id, ok=True,
+                )
+                if insider:
+                    break
             seen_keys = {
                 (k1, k2, k3) for (k1, k2, k3) in (await session.execute(
                     select(m.InsiderTx.ts, m.InsiderTx.insider_name, m.InsiderTx.shares)
