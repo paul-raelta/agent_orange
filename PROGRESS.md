@@ -133,3 +133,232 @@ clients inside agent stages.
 Visual QA on Settings: open `/settings`, confirm the DATA SOURCES panel
 renders the five built-ins with their status dots, exercise toggle / add
 / test / suggest. Then commit.
+
+---
+
+## Increment — Agent Run examiner overlay wired into RUN ALL AGENTS
+
+**Goal:** the RUN ALL AGENTS button plays the full-screen Document Examiner
+overlay, examining every watchlisted ticker in sequence as its own
+chapter, then refreshes the watchlist so freshly extracted figures appear.
+
+### Phase 1 — plumbing + AppShell hook (NVDA only, by accident)
+
+- `web/src/agent-run/examiner.{css,js}` — engine + styles, vanilla JS,
+  same files as `agent_orange_examiner/src/`.
+- `web/src/agent-run/examiner-docs.js` (new) — defined
+  `window.EXAMINER_COMPANIES`, a per-ticker registry of
+  `{ DOCS, EXTRACT, SOURCES }` matching the shape in
+  `agent_orange_examiner/README.md`. **Initially only NVDA was populated**
+  — overlay visibly examined NVDA on every run regardless of which
+  tickers the backend was actually running for.
+- `web/index.html` — loads `examiner-docs.js` before `examiner.js` so the
+  registry is in place when the engine reads it.
+- `examiner.js` — inline `DOCS/EXTRACT/SOURCES` consts replaced with
+  `let` slots hydrated from the registry; originals kept as `FALLBACK_*`
+  so the engine still plays if the docs script fails to load.
+- `web/src/layout/AppShell.tsx` — `runAll()` calls
+  `window.AgentRun.reset(); window.AgentRun.start();` and sets
+  `window.onAgentRunComplete = () => qc.invalidateQueries({ queryKey: keys.companies })`.
+- `web/src/screens/Watchlist.tsx` — removed the duplicate local AgentRun
+  wiring (and the now-unused `useQueryClient` / `keys` imports); the
+  button just calls `runAll()` from the shell context now.
+
+### Phase 2 — actually sequential per-ticker
+
+- `examiner-docs.js` — added **SNDK** (Q4 FY26 10-K + IR press release;
+  GAAP diluted EPS $0.79 on the schedules vs "adjusted" diluted EPS
+  $0.82 in the press release — the canonical demo of the routing-to-
+  REVIEW path) and **MU** (Q3 FY26 10-Q + press release, clean
+  corroboration like NVDA). Registry now: `{ NVDA, SNDK, MU }`.
+- `examiner.js` — `run()` rewritten as an async sequence:
+  - `start(tickersArg)` accepts a single string, an array, or
+    undefined; filters to tickers present in the registry; sets
+    `playlist` accordingly.
+  - `runOne(idx, ticker)` plays one ticker as a chapter (DISCOVER →
+    FETCH → PARSE → EXTRACT → CROSS-CHECK → VALIDATE) and resolves on
+    completion.
+  - Between chapters: sources column / extracted-data column / paper
+    are cleared; brand subtitle shows `examining <ticker> filings · N
+    of M`; pipeline rail resets to `discover`.
+  - Counters are cumulative — `tweenCountersTo(target, durMs)`
+    animates from the displayed value to a new cumulative target so
+    pages / tables / figures / sources / cost climb monotonically
+    across the whole run.
+  - SNDK's `conflict` flag on the adjusted-EPS extract row drives a
+    red "✗ conflicts with GAAP figure — routed to REVIEW" badge and a
+    `EPS DIVERGENCE … routed to REVIEW` validate phase; aggregate
+    summary reports `2 validated, 1 routed to REVIEW (SNDK)`.
+- `AppShell.tsx` — pulls `useCompanies()` and passes
+  `companies.map(c => c.ticker)` to `AgentRun.start()`.
+
+**Decisions baked in**
+- Engine stays vanilla JS, registry-driven; new tickers slot in via
+  `EXAMINER_COMPANIES` without touching the engine.
+- Counters accumulate (don't reset per chapter) — totals row in the
+  summary then reflects the whole run.
+- AppShell owns the overlay launch and completion callback so every
+  entry point to RUN ALL AGENTS gets identical behavior.
+- Tickers not present in the registry are silently dropped from the
+  playlist; if the playlist ends up empty the first registry key plays
+  as a fallback (so the overlay never goes black-screen).
+
+**Verification done**
+- `npm run build` green: 102 modules transformed.
+- TS check passes. `start` signature widened to
+  `(tickers?: string | string[])`.
+- SNDK chapter ends in `EPS DIVERGENCE … routed to REVIEW`; NVDA and
+  MU chapters end with `corroborated ×3` validation.
+
+**Files touched**
+- `web/index.html`
+- `web/src/agent-run/examiner.js`
+- `web/src/agent-run/examiner-docs.js` (new in phase 1, expanded in phase 2)
+- `web/src/layout/AppShell.tsx`
+- `web/src/screens/Watchlist.tsx`
+
+**Next step**
+Visual QA: open `/`, click RUN ALL AGENTS, confirm the overlay plays
+NVDA → SNDK → MU chapters, that SNDK's EPS divergence renders red and
+ends in `routed to REVIEW`, and that the aggregate summary shows
+`2 validated, 1 routed to REVIEW (SNDK)`.
+
+---
+
+## Increment — archive / delete companies + per-company source overrides
+
+**Goal:** users can take companies off the watchlist (and permanently
+purge them) and scope data sources per ticker without affecting other
+tickers.
+
+### Phase A — archive / restore / permanently delete
+
+- **DB:** new `companies.archived_at TEXT NULL` column. Idempotent
+  ALTER applied at API startup by a new `ensure_schema()` in
+  `workers/ao/db/engine.py`, called from the lifespan hook in
+  `workers/ao/main.py`. Existing DBs self-heal — no re-seed needed.
+  `ensure_schema()` runs `create_all()` (picks up new tables) plus a
+  `_COLUMN_MIGRATIONS` list for column adds.
+- **Backend:** `routes_companies.py` gains
+  - `POST /companies/{ticker}/archive` (idempotent),
+  - `POST /companies/{ticker}/restore`,
+  - `DELETE /companies/{ticker}` (refuses 409 unless archived; cascades
+    review_candidates → review_items → metrics → results → filings →
+    provenance → prices → news → insider_tx → agent_runs → sources via
+    ORM cascade → company).
+  - `GET /companies?archived=true|false` returns active vs archived
+    lists. `serialize_companies` takes the flag and filters on the
+    `archived_at` column.
+  - Scheduler jobs (`refresh_prices`, `refresh_news_insider`,
+    `recompute_windows`), `scheduler/scheduler.py` and
+    `routes_run._bg_run_all` skip archived companies so they don't get
+    polled or refreshed in the background.
+  - `serialize_company` emits `archivedAt` on the wire.
+- **Frontend:**
+  - `Company.tsx` (deep-dive) header gains an **ARCHIVE** ghost button.
+    Confirm → `useArchiveCompany()` → navigate back to `/`.
+  - `Companies.tsx` (`/companies`) gains an **ARCHIVED (N)** toggle in
+    the header. When toggled on, an archived panel renders below with
+    a **RESTORE** ghost button and a **PERMANENTLY DELETE** danger
+    button per row. Delete is double-confirmed.
+  - `Company` type gains `archivedAt?: string | null`.
+
+### Phase B — per-company source overrides + IR URL
+
+- **DB:** new table `company_source_overrides(id, company_id,
+  data_source_id, enabled, updated_at)` with a unique constraint on
+  (company_id, data_source_id). A row exists only when the company
+  diverges from the global DataSource enabled flag — keeps the table
+  small. `Company.ir_url` already existed on the model; now surfaced.
+- **Backend:**
+  - `source_registry.enabled_for(session, user_id, kind, *, company_id=None)`
+    — when `company_id` is given, pulls every kind-matching DataSource
+    (not just enabled), then applies the override map; absent rows
+    fall through to the global flag. Existing callers stay unchanged
+    semantically (no company_id → original behavior).
+  - `monitoring.py` (the filings stage) and the scheduler's
+    `refresh_prices` / `refresh_news_insider` loops now pass
+    `company_id=c.id` so overrides take effect for the real fetchers.
+  - `routes_companies.py` gains
+    - `PATCH /companies/{ticker}` (body `{irUrl}`), validating
+      `https://`,
+    - `GET /companies/{ticker}/sources` → list of `CompanyDataSource`
+      rows annotated with `effectiveEnabled` and `overridden`,
+    - `PATCH /companies/{ticker}/sources/{data_source_id}` (body
+      `{enabled}`) upserts an override,
+    - `DELETE /companies/{ticker}/sources/{data_source_id}` removes
+      the override, reverting to the global flag.
+  - New wire types: `CompanyDataSource`, `PatchCompanySourceRequest`,
+    `PatchCompanyRequest`. `Company` schema gains `irUrl`.
+- **Frontend:**
+  - `Company.tsx` deep-dive gains a **DATA SOURCES · per-company**
+    panel below the static SOURCES pill row. Lists each global source
+    with its effective enabled state (status dot + ENABLED/DISABLED
+    label + per-company-override-vs-global-default marker), a
+    DISABLE/ENABLE toggle, and a RESET button that appears once an
+    override exists.
+  - Below the source list, an **IR URL** input + SAVE button, wired
+    to `usePatchCompany`. Validates `https://` client-side, posts via
+    `PATCH /companies/{ticker}`.
+  - New hooks: `useCompanySources`, `usePatchCompanySource`,
+    `useResetCompanySource`, `usePatchCompany`.
+
+**Decisions baked in**
+- Soft + hard delete (per user request): every Remove is two clicks
+  (archive then delete from /companies). Active rows can't be
+  hard-deleted by accident.
+- Cascade is explicit in `DELETE /companies/{ticker}` — no
+  reliance-on-FK-cascade-only behavior, which SQLite doesn't enforce
+  by default.
+- Per-company overrides on global sources (per user request): the
+  data_sources table stays per-user, and a tiny override table only
+  records deviations. Global toggles in Settings still apply to all
+  tickers; per-ticker toggles on the deep-dive override that.
+- `ir_url` lives on Company (already in the model) — exposed via the
+  Company wire schema, edited via `PATCH /companies/{ticker}`.
+
+**Verification done**
+- Backend: `python -c "from ao.main import app"` → 41 routes (was 37).
+- Frontend: `npm run build` → 102 modules, green.
+- Schedulers/pipeline filtered to active companies; archived tickers
+  no longer get polled.
+
+**Files touched**
+- `workers/ao/db/models.py` — `Company.archived_at`,
+  `CompanySourceOverride`.
+- `workers/ao/db/engine.py` — `ensure_schema()` + column migrations.
+- `workers/ao/main.py` — call `ensure_schema()` in lifespan startup.
+- `workers/ao/api/schemas.py` — `Company.archivedAt`, `Company.irUrl`,
+  `CompanyDataSource`, `PatchCompanySourceRequest`,
+  `PatchCompanyRequest`.
+- `workers/ao/api/serializers.py` — archive filter + irUrl + archivedAt
+  in the wire shape; portfolio totals exclude archived.
+- `workers/ao/api/routes_companies.py` — archive/restore/delete +
+  PATCH company + GET/PATCH/DELETE per-company source.
+- `workers/ao/api/routes_run.py` — `_bg_run_all` skips archived.
+- `workers/ao/scheduler/jobs.py`, `scheduler/scheduler.py` — archived
+  filter; `enabled_for(..., company_id=...)` per company in the
+  per-ticker loops.
+- `workers/ao/agents/source_registry.py` —
+  `enabled_for(..., company_id=None)` with override merging.
+- `workers/ao/agents/monitoring.py` — pass `company_id` to
+  `enabled_for`.
+- `web/src/types.ts`, `api.ts`, `hooks.ts`,
+  `screens/Companies.tsx`, `screens/Company.tsx`.
+
+**Next step**
+Visual QA:
+1. `/company/NVDA` — click ARCHIVE, confirm, you're returned to `/`
+   and NVDA is gone from the watchlist (overlay would skip it on next
+   RUN ALL). Open `/companies`, click ARCHIVED (1), confirm RESTORE
+   brings it back, then archive again and confirm PERMANENTLY DELETE
+   wipes it (double-confirm) — try /company/NVDA after and expect a
+   404.
+2. `/company/SNDK` — in DATA SOURCES · per-company, click DISABLE on
+   SEC EDGAR. The label flips to `per-company override · DISABLED`,
+   RESET appears. Save an IR URL (`https://investor.sandisk.com`).
+   Click RESET on EDGAR and the label reverts to `global default`.
+3. Open `/settings` → DATA SOURCES — confirm SEC EDGAR global toggle
+   is independent of the SNDK override (toggling global off should
+   not affect a SNDK-enabled override; toggling global on does not
+   override a SNDK-disabled override).

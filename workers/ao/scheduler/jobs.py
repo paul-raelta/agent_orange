@@ -37,14 +37,22 @@ async def refresh_prices() -> None:
     user_id = get_settings().user_id
     Session = get_sessionmaker()
     async with Session() as session:
-        sources = await source_registry.enabled_for(session, user_id, kind="quote")
-        if not sources:
+        global_sources = await source_registry.enabled_for(
+            session, user_id, kind="quote",
+        )
+        if not global_sources:
             log.info("scheduler.prices_skipped_no_sources")
             return
         rows = (await session.execute(
-            select(m.Company).where(m.Company.user_id == user_id)
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
         )).scalars().all()
         for c in rows:
+            # Per-company overrides apply on top of the global enabled flag.
+            sources = await source_registry.enabled_for(
+                session, user_id, kind="quote", company_id=c.id,
+            )
             for src in sources:
                 try:
                     q = await src.fetcher(ticker=c.ticker)
@@ -72,19 +80,29 @@ async def refresh_news_insider() -> None:
     user_id = get_settings().user_id
     Session = get_sessionmaker()
     async with Session() as session:
-        news_sources = await source_registry.enabled_for(
+        # Global short-circuit: if no source is enabled at user level for both
+        # kinds, there's nothing per-company overrides can turn back on.
+        global_news = await source_registry.enabled_for(
             session, user_id, kind="news",
         )
-        insider_sources = await source_registry.enabled_for(
+        global_insider = await source_registry.enabled_for(
             session, user_id, kind="insider",
         )
-        if not news_sources and not insider_sources:
+        if not global_news and not global_insider:
             log.info("scheduler.news_insider_skipped_no_sources")
             return
         rows = (await session.execute(
-            select(m.Company).where(m.Company.user_id == user_id)
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
         )).scalars().all()
         for c in rows:
+            news_sources = await source_registry.enabled_for(
+                session, user_id, kind="news", company_id=c.id,
+            )
+            insider_sources = await source_registry.enabled_for(
+                session, user_id, kind="insider", company_id=c.id,
+            )
             # News
             news: list[dict] = []
             for src in news_sources:
@@ -166,7 +184,9 @@ async def recompute_windows() -> None:
     Session = get_sessionmaker()
     async with Session() as session:
         rows = (await session.execute(
-            select(m.Company).where(m.Company.user_id == user_id)
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
         )).scalars().all()
         for c in rows:
             w = await compute_next_window(session, c)

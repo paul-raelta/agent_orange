@@ -166,6 +166,12 @@ class Company(WireBase):
     # Only set on GET /companies/{ticker}; list endpoint omits these
     news: list[NewsItem] | None = None
     insider: list[InsiderTx] | None = None
+    # When non-null the company is soft-deleted: hidden from the watchlist by
+    # default, returned by GET /companies?archived=true, and DELETE is allowed.
+    archivedAt: str | None = None
+    # Optional investor-relations URL. When set, ir_fetcher uses it during the
+    # discover step instead of (or in addition to) the user-global IR source.
+    irUrl: str | None = None
 
 
 class ReviewCandidate(WireBase):
@@ -261,6 +267,34 @@ class PatchDataSourceRequest(WireBase):
     enabled: bool | None = None
     baseUrl: str | None = None
     name: str | None = None
+
+
+class CompanyDataSource(WireBase):
+    """A DataSource as it applies to one company: same fields as the global
+    DataSource plus `effectiveEnabled` (override applied) and `overridden`
+    (true iff a company-scoped override row exists for this pair)."""
+    id: str
+    sourceId: str
+    name: str
+    kind: DataSourceKind
+    origin: DataSourceOrigin
+    status: DataSourceStatus
+    enabled: bool  # global flag from the data_sources table
+    effectiveEnabled: bool  # what the agents actually see for this company
+    overridden: bool
+    baseUrl: str | None = None
+    authLabel: str
+    authSecretRef: str | None = None
+    lastOkAt: str | None = None
+    lastError: str | None = None
+
+
+class PatchCompanySourceRequest(WireBase):
+    enabled: bool
+
+
+class PatchCompanyRequest(WireBase):
+    irUrl: str | None = None
 
 
 class TestDataSourceResult(WireBase):

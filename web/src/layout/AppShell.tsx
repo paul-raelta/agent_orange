@@ -8,9 +8,21 @@
    shell context so the Settings screen can change it. */
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useReviewQueue, useRunAll, useUsage } from '../hooks'
+import { useQueryClient } from '@tanstack/react-query'
+import { keys, useCompanies, useReviewQueue, useRunAll, useUsage } from '../hooks'
 import { TweaksPanel } from '../theme/TweaksPanel'
 import type { RunFeedback, ShellContext } from './shellContext'
+
+declare global {
+  interface Window {
+    AgentRun?: {
+      start: (tickers?: string | string[]) => void
+      reset: () => void
+      hasRun: boolean
+    }
+    onAgentRunComplete?: () => void
+  }
+}
 
 const NAV = [
   { to: '/', label: 'Watchlist', icon: '▦', end: true },
@@ -35,8 +47,10 @@ function loadFeedback(): RunFeedback {
 }
 
 export function AppShell() {
+  const qc = useQueryClient()
   const { data: reviewQueue } = useReviewQueue()
   const { data: usage } = useUsage()
+  const { data: companies } = useCompanies()
   const runAllMutation = useRunAll()
 
   const [lastSync, setLastSync] = useState('Jul 30 · 09:12')
@@ -71,6 +85,17 @@ export function AppShell() {
 
   function runAll() {
     if (running) return
+    // Play the Document Examiner overlay alongside the backend kickoff. The
+    // engine examines each watchlist ticker in sequence (~9.5s/chapter), then
+    // refreshes companies so freshly extracted figures land on the watchlist.
+    if (window.AgentRun) {
+      window.onAgentRunComplete = () => {
+        qc.invalidateQueries({ queryKey: keys.companies })
+      }
+      const tickers = (companies ?? []).map((c) => c.ticker)
+      window.AgentRun.reset()
+      window.AgentRun.start(tickers.length ? tickers : undefined)
+    }
     runAllMutation.mutate(undefined, {
       onSuccess: (res) => {
         setLastSync(res.lastSync)

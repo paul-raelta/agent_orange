@@ -123,6 +123,10 @@ export type Company = {
   /* Populated on the deep-dive (GET /companies/:ticker); omitted by the list endpoint. */
   news?: NewsItem[] | null
   insider?: InsiderTx[] | null
+  /* Non-null iff the company is soft-deleted (hidden from watchlist). */
+  archivedAt?: string | null
+  /* Optional investor-relations URL — used by ir_fetcher when set. */
+  irUrl?: string | null
 }
 
 export type ReviewItem = {
@@ -171,6 +175,18 @@ export type RoutingRule = { task: string; desc: string; model: string }
 export type DataSourceKind = 'filings' | 'quote' | 'news' | 'insider' | 'ir'
 export type DataSourceStatus = 'active' | 'planned' | 'error'
 export type DataSourceOrigin = 'builtin' | 'user'
+
+export type CompanyDataSource = DataSource & {
+  /* What the agents actually see for this company — global enabled with the
+     per-company override applied. */
+  effectiveEnabled: boolean
+  /* True iff an override row exists for this (company, source) pair. */
+  overridden: boolean
+}
+
+export type PatchCompanyRequest = {
+  irUrl?: string | null
+}
 
 export type DataSource = {
   id: string

@@ -8,12 +8,14 @@ import type {
   ActivityRow,
   AddDataSourceRequest,
   Company,
+  CompanyDataSource,
   CreateSourceSuggestionRequest,
   DataSource,
   DiscoveryStatus,
   NewsItem,
   InsiderTx,
   NotificationPrefs,
+  PatchCompanyRequest,
   PatchDataSourceRequest,
   PortfolioTotals,
   Provider,
@@ -57,9 +59,32 @@ async function send<T>(
 
 export const api = {
   getCompanies: () => get<Company[]>('/companies'),
+  getArchivedCompanies: () => get<Company[]>('/companies?archived=true'),
   getCompany: (ticker: string) => get<Company>(`/companies/${ticker}`),
   setPosition: (ticker: string, body: { shares: number; costBasis: number }) =>
     send<Company>('POST', `/companies/${ticker}/position`, body),
+  patchCompany: (ticker: string, body: PatchCompanyRequest) =>
+    send<Company>('PATCH', `/companies/${ticker}`, body),
+  getCompanySources: (ticker: string) =>
+    get<CompanyDataSource[]>(`/companies/${ticker}/sources`),
+  patchCompanySource: (ticker: string, dsId: string, enabled: boolean) =>
+    send<CompanyDataSource>('PATCH', `/companies/${ticker}/sources/${dsId}`, { enabled }),
+  resetCompanySource: async (ticker: string, dsId: string) => {
+    const r = await fetch(API_BASE + `/companies/${ticker}/sources/${dsId}`, {
+      method: 'DELETE', credentials: 'omit',
+    })
+    if (!r.ok) throw new Error(`DELETE /companies/${ticker}/sources/${dsId} failed: ${r.status}`)
+  },
+  archiveCompany: (ticker: string) =>
+    send<Company>('POST', `/companies/${ticker}/archive`),
+  restoreCompany: (ticker: string) =>
+    send<Company>('POST', `/companies/${ticker}/restore`),
+  deleteCompany: async (ticker: string) => {
+    const r = await fetch(API_BASE + `/companies/${ticker}`, {
+      method: 'DELETE', credentials: 'omit',
+    })
+    if (!r.ok) throw new Error(`DELETE /companies/${ticker} failed: ${r.status}`)
+  },
 
   getReviewQueue: () => get<ReviewItem[]>('/review-queue'),
   resolveReview: (id: string, choice: string) =>

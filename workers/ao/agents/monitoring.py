@@ -48,7 +48,7 @@ async def poll_company(
     # enhancement could blend multiple filing-source results; v1 keeps it
     # simple — disabled sec_edgar means we skip the poll entirely.
     filing_sources = await source_registry.enabled_for(
-        session, user_id, kind="filings",
+        session, user_id, kind="filings", company_id=company.id,
     )
     edgar = next((s for s in filing_sources if s.source_id == "sec_edgar"), None)
     if edgar is None:

@@ -202,13 +202,20 @@ async def serialize_company(
         nextWindow=nextWindow, history=history,
         portfolio=portfolio, narrative=narrative,
         news=news, insider=insider,
+        archivedAt=c.archived_at,
+        irUrl=c.ir_url,
     )
 
 
-async def serialize_companies(session: AsyncSession, user_id: str) -> list[s.Company]:
-    rows = (await session.execute(
-        select(m.Company).where(m.Company.user_id == user_id).order_by(m.Company.ticker)
-    )).scalars().all()
+async def serialize_companies(
+    session: AsyncSession, user_id: str, *, archived: bool = False
+) -> list[s.Company]:
+    q = select(m.Company).where(m.Company.user_id == user_id)
+    if archived:
+        q = q.where(m.Company.archived_at.is_not(None))
+    else:
+        q = q.where(m.Company.archived_at.is_(None))
+    rows = (await session.execute(q.order_by(m.Company.ticker))).scalars().all()
     return [await serialize_company(session, c) for c in rows]
 
 
@@ -216,7 +223,9 @@ async def serialize_portfolio_totals(
     session: AsyncSession, user_id: str
 ) -> s.PortfolioTotals:
     rows = (await session.execute(
-        select(m.Company).where(m.Company.user_id == user_id)
+        select(m.Company).where(
+            m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+        )
     )).scalars().all()
     total_value = 0.0
     total_cost = 0.0

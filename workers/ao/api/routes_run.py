@@ -47,7 +47,9 @@ async def _bg_run_all(user_id: str) -> None:
     Session = get_sessionmaker()
     async with Session() as session:
         rows = (await session.execute(
-            select(m.Company.ticker).where(m.Company.user_id == user_id)
+            select(m.Company.ticker).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
         )).all()
 
     # Per-company pipeline (monitor → extract → validate → narrative → notify).

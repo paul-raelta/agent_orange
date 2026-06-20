@@ -29,7 +29,7 @@ Open <http://localhost:5173>. The UI hits the API on :8000.
 
 | Stage | Status | Notes |
 | --- | --- | --- |
-| API surface (20 endpoints) | ✅ live | All routes from plan §3 |
+| API surface (41 endpoints) | ✅ live | All routes from plan §3 + data-sources + archive |
 | Serializers (wire contract) | ✅ live | Round-trip with `web/src/types.ts` |
 | EDGAR client | ✅ live | Submissions JSON + filing download |
 | Finnhub client | ✅ live | Quotes + news + insider tx |
@@ -41,7 +41,10 @@ Open <http://localhost:5173>. The UI hits the API on :8000.
 | Validation (Opus structured) | 🟡 needs `ANTHROPIC_API_KEY` | Otherwise gracefully no-ops |
 | Narrative (Opus 2-3 sentences) | 🟡 needs `ANTHROPIC_API_KEY` | Otherwise gracefully no-ops |
 | Notifications dispatcher | ✅ live | UI (SSE) + email + SMS, per-event opt-in |
-| Scheduler (APScheduler) | ✅ live | poll/prices/news/windows jobs |
+| Scheduler (APScheduler) | ✅ live | poll/prices/news/windows jobs; skips archived |
+| Data Sources registry | ✅ live | Built-ins + user-added + suggestions; SSRF-guarded |
+| Per-company source overrides | ✅ live | Sparse overrides table; archive/restore/hard-delete |
+| Schema self-heal | ✅ live | `ensure_schema()` at API startup adds new columns idempotently |
 
 ## CLI
 

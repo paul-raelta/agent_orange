@@ -12,7 +12,9 @@ import type {
 
 export const keys = {
   companies: ['companies'] as const,
+  archivedCompanies: ['companies', 'archived'] as const,
   company: (ticker: string) => ['companies', ticker] as const,
+  companySources: (ticker: string) => ['companies', ticker, 'sources'] as const,
   reviewQueue: ['review-queue'] as const,
   activity: (ticker?: string) => ['activity', ticker ?? 'all'] as const,
   usage: ['usage'] as const,
@@ -29,8 +31,84 @@ export const keys = {
 export const useCompanies = () =>
   useQuery({ queryKey: keys.companies, queryFn: api.getCompanies })
 
+export const useArchivedCompanies = () =>
+  useQuery({ queryKey: keys.archivedCompanies, queryFn: api.getArchivedCompanies })
+
 export const useCompany = (ticker: string) =>
   useQuery({ queryKey: keys.company(ticker), queryFn: () => api.getCompany(ticker) })
+
+function invalidateCompanyLists(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: keys.companies })
+  qc.invalidateQueries({ queryKey: keys.archivedCompanies })
+  qc.invalidateQueries({ queryKey: keys.portfolioTotals })
+}
+
+export const useArchiveCompany = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ticker: string) => api.archiveCompany(ticker),
+    onSuccess: (_d, ticker) => {
+      invalidateCompanyLists(qc)
+      qc.invalidateQueries({ queryKey: keys.company(ticker) })
+    },
+  })
+}
+
+export const useRestoreCompany = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ticker: string) => api.restoreCompany(ticker),
+    onSuccess: (_d, ticker) => {
+      invalidateCompanyLists(qc)
+      qc.invalidateQueries({ queryKey: keys.company(ticker) })
+    },
+  })
+}
+
+export const useDeleteCompany = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ticker: string) => api.deleteCompany(ticker),
+    onSuccess: (_d, ticker) => {
+      invalidateCompanyLists(qc)
+      qc.removeQueries({ queryKey: keys.company(ticker) })
+    },
+  })
+}
+
+export const usePatchCompany = (ticker: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { irUrl?: string | null }) => api.patchCompany(ticker, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.company(ticker) })
+      qc.invalidateQueries({ queryKey: keys.companies })
+    },
+  })
+}
+
+export const useCompanySources = (ticker: string) =>
+  useQuery({
+    queryKey: keys.companySources(ticker),
+    queryFn: () => api.getCompanySources(ticker),
+  })
+
+export const usePatchCompanySource = (ticker: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api.patchCompanySource(ticker, id, enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.companySources(ticker) }),
+  })
+}
+
+export const useResetCompanySource = (ticker: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.resetCompanySource(ticker, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.companySources(ticker) }),
+  })
+}
 
 export const useReviewQueue = () =>
   useQuery({ queryKey: keys.reviewQueue, queryFn: api.getReviewQueue })

@@ -81,6 +81,11 @@ class Company(Base):
 
     created_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+    # Soft-delete marker. When non-null the company is hidden from the watchlist
+    # but related rows (filings/results/metrics/prices/news/insider/agent_runs)
+    # are kept. Permanent purge — DELETE /companies/{ticker} — requires the row
+    # to be archived first.
+    archived_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
     sources: Mapped[list["Source"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"
@@ -400,6 +405,36 @@ class DataSource(Base):
     last_ok_at: Mapped[str | None] = mapped_column(String, nullable=True)
     last_error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+
+
+class CompanySourceOverride(Base):
+    """Per-company override of a global DataSource's enabled flag.
+
+    A row exists only when the company deviates from the global default; absent
+    rows mean "use whatever the DataSource is set to in Settings". This keeps
+    the table small even when the user toggles a lot of (company, source)
+    combinations back to default.
+
+    The agent pipeline asks `source_registry.enabled_for(..., company_id=...)`,
+    which merges DataSource.enabled with any override row.
+    """
+    __tablename__ = "company_source_overrides"
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id", "data_source_id", name="uq_csoverride_company_source"
+        ),
+        Index("ix_csoverride_company", "company_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    company_id: Mapped[str] = mapped_column(
+        String, ForeignKey("companies.id"), nullable=False
+    )
+    data_source_id: Mapped[str] = mapped_column(
+        String, ForeignKey("data_sources.id"), nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
 
 

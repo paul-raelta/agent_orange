@@ -67,3 +67,48 @@ async def create_all() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+# Columns added to existing tables after the initial schema was first applied.
+# Each entry is (table, column, type) — SQLite ALTER TABLE ADD COLUMN.
+# create_all() handles new tables; this list handles new columns.
+_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
+    ("companies", "archived_at", "TEXT"),
+]
+
+
+async def ensure_schema() -> None:
+    """Run create_all() + idempotent column adds for existing DBs.
+
+    Called from the API lifespan startup AND the daemon's startup so an
+    existing seed-from-an-older-version DB self-heals without requiring a
+    re-seed or manual ALTER. Both processes can race this safely: the
+    PRAGMA check + the swallowed "duplicate column" error make ALTER
+    runs cooperative.
+    """
+    await create_all()
+    engine = get_engine()
+    if not str(engine.url).startswith("sqlite"):
+        # ALTER TABLE syntax differs on Postgres; revisit when we migrate.
+        return
+    async with engine.begin() as conn:
+        for table, column, type_ in _COLUMN_MIGRATIONS:
+            rows = (
+                await conn.exec_driver_sql(f"PRAGMA table_info({table})")
+            ).fetchall()
+            cols = {r[1] for r in rows}
+            if column in cols:
+                continue
+            try:
+                await conn.exec_driver_sql(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {type_}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                # Race: another process (api ↔ daemon) added the column
+                # between PRAGMA and ALTER. Re-check; only re-raise if it
+                # genuinely failed.
+                rows2 = (
+                    await conn.exec_driver_sql(f"PRAGMA table_info({table})")
+                ).fetchall()
+                if column not in {r[1] for r in rows2}:
+                    raise

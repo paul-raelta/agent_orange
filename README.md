@@ -10,6 +10,65 @@ anything it can't auto-validate to a human review queue.
 The full product brief — screen specs, data contract, design tokens — lives
 in [`design/HANDOFF.md`](design/HANDOFF.md).
 
+## Aim of the app
+
+An automated equity-watchlist agent. You give it tickers; it watches their
+filings + market data, extracts the financial figures with provenance back
+to the source, flags anything that doesn't reconcile, and tells you what's
+worth knowing — so you don't have to read 10-Qs yourself.
+
+### Sources it collects
+
+Per user, per ticker, all toggleable in Settings → Data Sources, with
+per-company overrides on the deep-dive:
+
+- **SEC EDGAR** — submissions feed, 10-Q / 10-K / 8-K / Form 4 detection
+- **Finnhub quote** — live price, refreshed every 5 min in market hours
+- **Finnhub news** — last 30 days of headlines per ticker
+- **Finnhub insider** — Form 4 transactions, newest first
+- **IR fetcher** — investor-relations page for press releases (per-company
+  IR URL set on the deep-dive)
+- **User-added custom feeds** — any `https://` URL, fetched through the
+  SSRF-guarded `safe_fetch` middle-path (DNS pre-resolve, private-IP block,
+  10s timeout, 5 MB cap, ≤3 redirects each re-validated)
+- **Suggest-a-source** — wishlist table users can post into
+
+Each source can be toggled globally in Settings or overridden per-ticker on
+the deep-dive (e.g. disable IR fetcher for NVDA only). Per-company
+overrides are stored in a sparse `company_source_overrides` table —
+absence of a row means "inherit the global flag".
+
+### What it gives back
+
+After the agents run:
+
+1. **Watchlist portfolio strip** — total value, cost basis, unrealized P&L
+   across your holdings
+2. **Per-ticker deep-dive** — extracted GAAP figures with provenance back
+   to the filing, live quote, 30-day news, insider tx
+3. **AI narrative card** — 2–3 sentence "what's worth knowing" (≤200 tokens,
+   gated on `ANTHROPIC_API_KEY`)
+4. **Review queue** — anything that doesn't reconcile. Canonical case:
+   SanDisk GAAP diluted EPS $0.79 on the schedule vs adjusted $0.82 in the
+   press release → routed to REVIEW instead of silently picking one
+5. **Notifications** — SMS (Twilio, live) + email (Gmail SMTP, needs app
+   password), per-event opt-in
+6. **Live UI updates** — SSE pushes `company.updated` / `review.added` so
+   the screen reflects pipeline progress without refresh
+7. **RUN ALL AGENTS overlay** — the full-screen Document Examiner playing
+   each watchlisted ticker as a chapter (DISCOVER → FETCH → PARSE → EXTRACT
+   → CROSS-CHECK → VALIDATE), cumulative counters, and a final summary like
+   `2 validated, 1 routed to REVIEW (SNDK)`
+8. **Watchlist hygiene** — ARCHIVE a ticker from its deep-dive (it stops
+   being polled / refreshed / included in RUN ALL); RESTORE from
+   `/companies → ARCHIVED`; PERMANENTLY DELETE (double-confirmed)
+   cascades the full per-ticker history — filings, metrics, provenance,
+   prices, news, insider, agent runs, sources, review items
+
+Short version: **collect filings + quotes + news + insider tx → extract
+figures with provenance → reconcile, route conflicts to a human review
+queue, surface a short narrative + notifications.**
+
 ## Demo
 
 A ~86-second product walkthrough (autoplay + captions + simulated cursor)
@@ -70,7 +129,7 @@ Pixel-faithful reimplementation of the prototype.
 
 Python 3.12 + FastAPI + SQLite + SQLAlchemy 2.x async + APScheduler.
 
-- **API**: 20 endpoints serving the wire contract from `web/src/types.ts`,
+- **API**: 41 endpoints serving the wire contract from `web/src/types.ts`,
   with the serializer layer in `ao/api/serializers.py` as the contract gate
 - **Integrations**: SEC EDGAR (filing detection + download), Finnhub
   (quotes / news / Form 4 insider tx), Anthropic SDK (Opus + tool use for

@@ -29,8 +29,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     setup_logging(settings.log_level)
     ensure_var_dirs()
     log.info("api.startup", port=settings.api_port, db=settings.database_url)
-    # API routers will be mounted in create_app(); DB engine init happens lazily
-    # on first query via ao.db.engine.get_session().
+    # Ensure the schema reflects current models — creates any new tables and
+    # applies idempotent column adds to existing tables.
+    from ao.db.engine import ensure_schema
+
+    await ensure_schema()
     if settings.run_scheduler_in_process and settings.scheduler_mode == "inproc":
         log.info("scheduler.starting_in_api_process")
         # Avoided circular: imported here, not at module top.

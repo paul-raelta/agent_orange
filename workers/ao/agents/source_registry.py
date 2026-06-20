@@ -176,19 +176,39 @@ async def ensure_builtins(session: AsyncSession, user_id: str) -> None:
 
 async def enabled_for(
     session: AsyncSession, user_id: str, kind: str,
+    *, company_id: str | None = None,
 ) -> list[ResolvedSource]:
     """Return ordered enabled sources for a kind. Built-ins first, then
-    user-origin (in created_at order)."""
+    user-origin (in created_at order).
+
+    When `company_id` is given, per-company overrides in
+    `company_source_overrides` win over the global enabled flag — that's how
+    the Company deep-dive's SOURCES panel scopes feeds (e.g. disable EDGAR
+    for one ticker without affecting the rest)."""
     await ensure_builtins(session, user_id)
+    # Pull every source for this kind owned by the user, regardless of enabled
+    # state — we filter after merging per-company overrides.
     rows = (await session.execute(
         select(m.DataSource).where(
             m.DataSource.user_id == user_id,
             m.DataSource.kind == kind,
-            m.DataSource.enabled == True,  # noqa: E712
         ).order_by(m.DataSource.origin.desc(), m.DataSource.created_at)
     )).scalars().all()
+
+    overrides: dict[str, bool] = {}
+    if company_id is not None:
+        ov_rows = (await session.execute(
+            select(m.CompanySourceOverride).where(
+                m.CompanySourceOverride.company_id == company_id,
+            )
+        )).scalars().all()
+        overrides = {ov.data_source_id: ov.enabled for ov in ov_rows}
+
     out: list[ResolvedSource] = []
     for row in rows:
+        effective_enabled = overrides.get(row.id, row.enabled)
+        if not effective_enabled:
+            continue
         if row.origin == "builtin":
             fetcher = BUILTIN_FETCHERS.get(row.source_id)
             if fetcher is None:

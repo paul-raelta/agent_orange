@@ -36,7 +36,9 @@ async def start_scheduler() -> AsyncIOScheduler:
     Session = get_sessionmaker()
     async with Session() as session:
         companies = (await session.execute(
-            select(m.Company).where(m.Company.user_id == user_id)
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
         )).scalars().all()
     for c in companies:
         scheduler.add_job(

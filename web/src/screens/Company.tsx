@@ -18,9 +18,14 @@ import { LogList } from '../components/LogList'
 import { Loading } from '../components/Loading'
 import {
   useActivity,
+  useArchiveCompany,
   useCompany,
+  useCompanySources,
   useInsider,
   useNews,
+  usePatchCompany,
+  usePatchCompanySource,
+  useResetCompanySource,
   useSetPosition,
 } from '../hooks'
 import type { HistoryRow, Metric } from '../types'
@@ -57,8 +62,20 @@ export function Company() {
   const { data: news } = useNews(ticker)
   const { data: insider } = useInsider(ticker)
   const setPosition = useSetPosition(ticker)
+  const archive = useArchiveCompany()
+  const { data: companySources } = useCompanySources(ticker)
+  const patchCompanySource = usePatchCompanySource(ticker)
+  const resetCompanySource = useResetCompanySource(ticker)
+  const patchCompany = usePatchCompany(ticker)
   const [tab, setTab] = useState<Tab>('results')
   const [prov, setProv] = useState<Metric | null>(null)
+  const [irUrlInput, setIrUrlInput] = useState('')
+
+  function handleArchive() {
+    if (!c) return
+    if (!window.confirm(`Archive ${c.ticker}? It will be hidden from the watchlist; historical data is kept and you can restore it from /companies.`)) return
+    archive.mutate(c.ticker, { onSuccess: () => navigate('/') })
+  }
 
   // Local edit state for the portfolio inputs — synced from the loaded company
   // so users can type freely without each keystroke being committed.
@@ -68,8 +85,18 @@ export function Company() {
     if (c) {
       setSharesInput(String(c.portfolio.shares || ''))
       setCostInput(String(c.portfolio.costBasis || ''))
+      setIrUrlInput(c.irUrl ?? '')
     }
   }, [c])
+
+  function saveIrUrl() {
+    const v = irUrlInput.trim()
+    if (v && !(v.startsWith('https://') || v.startsWith('http://'))) {
+      window.alert('IR URL must start with https://')
+      return
+    }
+    patchCompany.mutate({ irUrl: v || null })
+  }
 
   if (isLoading) return <Loading title={ticker} />
   if (!c) {
@@ -115,6 +142,9 @@ export function Company() {
         <div className="co-hd-right">
           <Price price={c.price} change={c.dayChange} />
           <StatusChip status={c.status} pulse />
+          <Btn kind="ghost" sm onClick={handleArchive} disabled={archive.isPending}>
+            {archive.isPending ? 'ARCHIVING…' : 'ARCHIVE'}
+          </Btn>
         </div>
       </div>
 
@@ -128,6 +158,81 @@ export function Company() {
         ))}
         <span className="src-mode">mode: {c.sourceMode}</span>
       </div>
+
+      <Panel title="DATA SOURCES · per-company">
+        <p className="panel-help">
+          Each global data source can be enabled or disabled for {c.ticker} without
+          affecting other tickers. An override here wins over the Settings → Data
+          sources flag for this company.
+        </p>
+        {!companySources ? (
+          <div className="empty">Loading sources…</div>
+        ) : (
+          <div className="ds-list">
+            {companySources.map((src) => (
+              <div
+                className={'ds-row' + (src.effectiveEnabled ? '' : ' disabled')}
+                key={src.id}
+              >
+                <span className={'ds-dot ' + (src.effectiveEnabled ? 'active' : 'planned')} />
+                <div className="ds-id">
+                  <b>{src.name}</b>
+                  <span>{src.kind}</span>
+                </div>
+                <span className="cfg-mode">
+                  {src.overridden ? 'per-company override' : 'global default'}
+                </span>
+                <span className="cfg-mode">
+                  {src.effectiveEnabled ? 'ENABLED' : 'DISABLED'}
+                </span>
+                <div className="cfg-actions">
+                  <Btn
+                    kind="ghost"
+                    sm
+                    onClick={() =>
+                      patchCompanySource.mutate({
+                        id: src.id,
+                        enabled: !src.effectiveEnabled,
+                      })
+                    }
+                    disabled={patchCompanySource.isPending}
+                  >
+                    {src.effectiveEnabled ? 'DISABLE' : 'ENABLE'}
+                  </Btn>
+                  {src.overridden && (
+                    <Btn
+                      kind="ghost"
+                      sm
+                      onClick={() => resetCompanySource.mutate(src.id)}
+                      disabled={resetCompanySource.isPending}
+                    >
+                      RESET
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="add-row" style={{ marginTop: 12 }}>
+          <span className="lbl">IR URL</span>
+          <input
+            className="inp"
+            placeholder="https://investor.example.com/quarterly-results"
+            value={irUrlInput}
+            onChange={(e) => setIrUrlInput(e.target.value)}
+          />
+          <Btn
+            kind="primary"
+            sm
+            onClick={saveIrUrl}
+            disabled={patchCompany.isPending || irUrlInput === (c.irUrl ?? '')}
+          >
+            {patchCompany.isPending ? 'SAVING…' : 'SAVE'}
+          </Btn>
+        </div>
+      </Panel>
 
       {c.narrative && (
         <div className="ai-narrative">

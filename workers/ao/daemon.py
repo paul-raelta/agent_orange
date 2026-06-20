@@ -28,6 +28,14 @@ async def _main() -> None:
         log.warning("daemon.scheduler_mode_external_nothing_to_do")
         return
 
+    # Apply pending schema migrations before the scheduler hits the DB. The
+    # API process does the same in its lifespan hook — but the daemon is its
+    # own process and starts in parallel with the API, so it can't rely on
+    # the API having migrated yet.
+    from ao.db.engine import ensure_schema
+
+    await ensure_schema()
+
     from ao.scheduler.scheduler import start_scheduler
 
     await start_scheduler()
