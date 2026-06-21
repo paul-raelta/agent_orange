@@ -514,6 +514,17 @@ async def serialize_feature_flags(
     )
 
 
+async def serialize_validation_thresholds(
+    session: AsyncSession, user_id: str
+) -> s.ValidationThresholds:
+    row = await session.get(m.ValidationThreshold, user_id)
+    if row is None:
+        return s.ValidationThresholds()
+    return s.ValidationThresholds(
+        epsAbs=row.eps_abs, marginPct=row.margin_pct, revenuePct=row.revenue_pct,
+    )
+
+
 async def serialize_notification_prefs(
     session: AsyncSession, user_id: str
 ) -> s.NotificationPrefs:

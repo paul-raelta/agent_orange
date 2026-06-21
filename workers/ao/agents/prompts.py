@@ -83,25 +83,44 @@ EXTRACTION_TOOL = {
 
 # ---------------------------------------------------------------------------
 
-PROMPT_VERSION_VALIDATION = "v1"
-VALIDATION_SYSTEM = """\
-You are validating financial figures extracted from a single quarterly
-filing. You will receive a JSON list of (key, value, page, source_label,
-quote) tuples — possibly multiple per metric. The validation rule is:
+PROMPT_VERSION_VALIDATION = "v2"
 
-  Each metric must appear in ≥2 distinct locations OR have one
-  high-confidence source (income statement). Conflicts MUST be flagged.
 
-Output a single JSON object via the `record_validation` tool. Per-metric
-verdict rules:
-- confidence "high" when ≥2 locations agree (within $0.001 for EPS,
-  within 0.1% for margins, within 1% for revenue / net income).
-- confidence "med" when 1 source, OR ≥2 sources with rounding-level disagreement.
-- confidence "low" when 2 sources DISAGREE materially. In that case set
-  `conflict=true` and list the alternative values.
+def _fmt_eps(v: float) -> str:
+    s = f"{v:.6f}".rstrip("0").rstrip(".")
+    return s or "0"
 
-Treat GAAP vs non-GAAP EPS discrepancies as conflicts — do NOT auto-resolve.
-"""
+
+def _fmt_pct(v: float) -> str:
+    s = f"{v:.4f}".rstrip("0").rstrip(".")
+    return s or "0"
+
+
+def validation_system(
+    eps_abs: float = 0.001,
+    margin_pct: float = 0.1,
+    revenue_pct: float = 1.0,
+) -> str:
+    """Build the validation system prompt with per-user tolerance bands.
+    Configured via PUT /settings/thresholds."""
+    return (
+        "You are validating financial figures extracted from a single quarterly\n"
+        "filing. You will receive a JSON list of (key, value, page, source_label,\n"
+        "quote) tuples — possibly multiple per metric. The validation rule is:\n\n"
+        "  Each metric must appear in ≥2 distinct locations OR have one\n"
+        "  high-confidence source (income statement). Conflicts MUST be flagged.\n\n"
+        "Output a single JSON object via the `record_validation` tool. Per-metric\n"
+        "verdict rules:\n"
+        f'- confidence "high" when ≥2 locations agree (within ${_fmt_eps(eps_abs)} for EPS,\n'
+        f"  within {_fmt_pct(margin_pct)}% for margins, within {_fmt_pct(revenue_pct)}% for revenue / net income).\n"
+        '- confidence "med" when 1 source, OR ≥2 sources with rounding-level disagreement.\n'
+        '- confidence "low" when 2 sources DISAGREE materially. In that case set\n'
+        "  `conflict=true` and list the alternative values.\n\n"
+        "Treat GAAP vs non-GAAP EPS discrepancies as conflicts — do NOT auto-resolve.\n"
+    )
+
+
+VALIDATION_SYSTEM = validation_system()
 
 VALIDATION_TOOL = {
     "name": "record_validation",

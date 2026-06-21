@@ -28,6 +28,7 @@ import type {
   TestDataSourceResult,
   UniverseCompany,
   Usage,
+  ValidationThresholds,
 } from './types'
 import { SP500_UNIVERSE } from './data/sp500'
 
@@ -125,6 +126,12 @@ export const api = {
   getFeatureFlags: () => get<FeatureFlags>('/settings/flags'),
   putFeatureFlags: (body: FeatureFlags) =>
     send<FeatureFlags>('PUT', '/settings/flags', body),
+
+  // Validation tolerance bands (fed into the validation prompt at run time)
+  getValidationThresholds: () =>
+    get<ValidationThresholds>('/settings/thresholds'),
+  putValidationThresholds: (body: ValidationThresholds) =>
+    send<ValidationThresholds>('PUT', '/settings/thresholds', body),
 
   // Guidance — only fetched by the UI when flags.guidance is on.
   getGuidance: (ticker: string) =>

@@ -128,6 +128,20 @@ export const DEFAULT_FLAGS: FeatureFlags = {
   guidance: true,
 }
 
+/* Validation tolerance bands. Two cross-document sources must agree
+   within these to count as corroborated (conf=high). Outside the band →
+   conflict, routed to the review queue. Editable from Settings → VALIDATION. */
+export type ValidationThresholds = {
+  epsAbs: number      // dollars
+  marginPct: number   // percentage points
+  revenuePct: number  // percentage points
+}
+export const DEFAULT_THRESHOLDS: ValidationThresholds = {
+  epsAbs: 0.001,
+  marginPct: 0.1,
+  revenuePct: 1.0,
+}
+
 /* Consensus / Surprise — Feature 1 (flags.consensus). Optional Metric field. */
 export type MetricConsensus = {
   estimate: number

@@ -10,8 +10,9 @@ import type {
   NotificationPrefs,
   PatchDataSourceRequest,
   RoutingRule,
+  ValidationThresholds,
 } from './types'
-import { DEFAULT_FLAGS } from './types'
+import { DEFAULT_FLAGS, DEFAULT_THRESHOLDS } from './types'
 
 export const keys = {
   companies: ['companies'] as const,
@@ -30,6 +31,7 @@ export const keys = {
   insider: (ticker: string) => ['insider', ticker] as const,
   notificationPrefs: ['settings', 'notifications'] as const,
   featureFlags: ['settings', 'flags'] as const,
+  validationThresholds: ['settings', 'thresholds'] as const,
   dataSources: ['data-sources'] as const,
   sourceSuggestions: ['source-suggestions'] as const,
 }
@@ -101,6 +103,29 @@ export function useFeatureFlags() {
     flags: query.data ?? localFlags,
     setFlag: (key: keyof FeatureFlags, value: boolean) =>
       mutation.mutate({ ...(query.data ?? localFlags), [key]: value }),
+    saving: mutation.isPending,
+  }
+}
+
+/* --- Validation thresholds ------------------------------------------------ */
+
+export function useValidationThresholds() {
+  const qc = useQueryClient()
+  const query = useQuery({
+    queryKey: keys.validationThresholds,
+    queryFn: api.getValidationThresholds,
+    initialData: DEFAULT_THRESHOLDS,
+    initialDataUpdatedAt: 0,
+    staleTime: 30_000,
+  })
+  const mutation = useMutation({
+    mutationFn: (next: ValidationThresholds) =>
+      api.putValidationThresholds(next),
+    onSuccess: (saved) => qc.setQueryData(keys.validationThresholds, saved),
+  })
+  return {
+    thresholds: query.data ?? DEFAULT_THRESHOLDS,
+    saveThresholds: mutation.mutate,
     saving: mutation.isPending,
   }
 }

@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ao.api import schemas as s
 from ao.api.deps import current_user_id, get_db
-from ao.api.serializers import serialize_feature_flags, serialize_notification_prefs
+from ao.api.serializers import (
+    serialize_feature_flags,
+    serialize_notification_prefs,
+    serialize_validation_thresholds,
+)
 from ao.db import models as m
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -64,3 +68,31 @@ async def put_flags(
     row.guidance = bool(body.guidance)
     await db.commit()
     return await serialize_feature_flags(db, user_id)
+
+
+@router.get("/thresholds", response_model=s.ValidationThresholds)
+async def get_thresholds(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(current_user_id),
+):
+    return await serialize_validation_thresholds(db, user_id)
+
+
+@router.put("/thresholds", response_model=s.ValidationThresholds)
+async def put_thresholds(
+    body: s.ValidationThresholds,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(current_user_id),
+):
+    eps = max(0.0, float(body.epsAbs))
+    margin = max(0.0, float(body.marginPct))
+    revenue = max(0.0, float(body.revenuePct))
+    row = await db.get(m.ValidationThreshold, user_id)
+    if row is None:
+        row = m.ValidationThreshold(user_id=user_id)
+        db.add(row)
+    row.eps_abs = eps
+    row.margin_pct = margin
+    row.revenue_pct = revenue
+    await db.commit()
+    return await serialize_validation_thresholds(db, user_id)

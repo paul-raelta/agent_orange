@@ -1276,3 +1276,93 @@ whether filings/news direction aligns with recent price direction.
 Manual UI smoke with a real ANTHROPIC_API_KEY (run pipeline for a ticker, confirm
 gauge + breakdown render and colour matches pct). Optionally add a Playwright spec
 for the confidence gauge/drawer.
+
+---
+
+## Increment — User-configurable validation thresholds
+
+**Goal:** the tolerance bands that decide "corroborated vs route-to-review"
+used to be hard-coded literals (`$0.001` EPS, `0.1%` margins, `1%` revenue)
+inside the `VALIDATION_SYSTEM` prompt string. Move them into per-user state
+that gets interpolated into the prompt at run time, and expose a Settings
+panel for editing.
+
+**What landed**
+- **DB:** new `validation_thresholds` table — `(user_id PK, eps_abs Float
+  default 0.001, margin_pct Float default 0.1, revenue_pct Float default
+  1.0)`. Picked up by `create_all()` in `ensure_schema()` at app boot, so
+  existing SQLite files self-heal on next startup.
+- **Backend prompt:** `prompts.py` — `VALIDATION_SYSTEM` constant replaced
+  with `validation_system(eps_abs, margin_pct, revenue_pct)` builder.
+  Bumped `PROMPT_VERSION_VALIDATION` v1 → v2. Module-level
+  `VALIDATION_SYSTEM = validation_system()` kept so any future caller using
+  the constant still gets defaults. `validate_metrics()` now loads
+  `serialize_validation_thresholds(session, user_id)` and passes the three
+  floats into `validation_system()` before each Anthropic call.
+- **Backend API:** `GET|PUT /api/v1/settings/thresholds` modelled on
+  `/settings/flags`. PUT clamps negatives to 0; values pass through
+  otherwise. New `ValidationThresholds` Pydantic schema and
+  `serialize_validation_thresholds()` helper.
+- **Frontend:** `ValidationThresholds` type + `DEFAULT_THRESHOLDS` in
+  `types.ts`; `api.getValidationThresholds` / `putValidationThresholds`;
+  `useValidationThresholds()` hook with optimistic-cache write-through.
+  New `VALIDATION — review thresholds` panel on Settings, between LABS and
+  DATA SOURCES. Three numeric inputs (EPS / Margins / Revenue), SAVE +
+  DEFAULTS buttons. SAVE is disabled until the draft diverges.
+- **CSS:** `.thr-input` + `.thr-actions` in `app.css` so the input row sits
+  cleanly in the `.ff-row` slot the `.sw` toggle uses on the LABS panel.
+
+**Decisions baked in**
+- Per-user, not global — same model as `feature_flags` /
+  `notification_prefs`. The default-when-no-row path keeps every existing
+  user untouched (returns the historic literals).
+- GAAP-vs-non-GAAP EPS still always routes to review, regardless of band.
+  That rule lives in the prompt body (`prompts.py` final line of
+  `validation_system()`), not in any number.
+- Builder function instead of `.format()` on the constant — keeps the
+  prompt body literal-safe (no curly brace escaping) and makes the
+  defaulted constant a one-line `validation_system()` call.
+- Hard-clamp negatives to 0 on PUT (rather than 422). Treat the input as
+  "I don't want a tolerance" → all disagreement becomes a conflict.
+- Did NOT expose this in the UI on the deep-dive validation card; bands
+  are a global setting per user, not a per-company override. (If a future
+  need arises, add a `company_id` column to the table, fall back to
+  user-scope when absent.)
+
+**Verification done**
+- `npm run build` → tsc clean, 110 modules (was 107), 60.29 KB CSS.
+- `python -c "from ao.main import app"` → 38 routes; new ones present:
+  `GET|PUT /api/v1/settings/thresholds`.
+- `validation_system(eps=0.02, margin=0.5, revenue=2.5)` interpolation
+  smoke: returns a string containing `$0.02`, `0.5%`, `2.5%` in the right
+  positions.
+- ASGI in-process smoke (with `ensure_schema()` to create the new table):
+  - `GET /settings/thresholds` → 200 `{epsAbs: 0.001, marginPct: 0.1,
+    revenuePct: 1.0}` for fresh user.
+  - `PUT` with `{0.05, 0.25, 1.5}` → 200 echo; subsequent GET reflects.
+  - `PUT` with negatives → 200 `{0, 0, 0}` (clamped).
+  - `PUT` back to defaults → 200 confirmed.
+
+**Files touched**
+- `workers/ao/db/models.py` — new `ValidationThreshold` model.
+- `workers/ao/agents/prompts.py` — `validation_system()` builder,
+  `PROMPT_VERSION_VALIDATION = "v2"`.
+- `workers/ao/agents/validation.py` — load thresholds, pass into builder.
+- `workers/ao/api/schemas.py` — `ValidationThresholds` wire schema.
+- `workers/ao/api/serializers.py` — `serialize_validation_thresholds`.
+- `workers/ao/api/routes_settings.py` — `GET|PUT /settings/thresholds`.
+- `web/src/types.ts` — `ValidationThresholds`, `DEFAULT_THRESHOLDS`.
+- `web/src/api.ts` — `getValidationThresholds`, `putValidationThresholds`.
+- `web/src/hooks.ts` — `useValidationThresholds`, `keys.validationThresholds`.
+- `web/src/screens/Settings.tsx` — `ValidationThresholdsPanel` +
+  `THRESH_DEFS`.
+- `web/src/styles/app.css` — `.thr-input`, `.thr-actions`.
+
+**Next step**
+Visual QA: `/settings` → VALIDATION panel renders between LABS and DATA
+SOURCES with three numeric rows. Edit any value → SAVE enables; click →
+hint disappears. Refresh → values persist. With Anthropic key wired, run
+the pipeline against NVDA and inspect the next `agent_runs` row tagged
+`validation` — the system prompt sent (logged in `model` / `prompt_version`
+trace, if surfaced) should reflect the new bands. Click DEFAULTS → fields
+revert to `0.001 / 0.1 / 1.0`; SAVE re-enables.

@@ -418,6 +418,19 @@ class FeatureFlag(Base):
     guidance: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class ValidationThreshold(Base):
+    """Per-user tolerance bands fed into the validation prompt.
+    Two sources must agree within these to count as corroborated (conf=high).
+    Outside the band → conflict, routed to the review queue."""
+
+    __tablename__ = "validation_thresholds"
+
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    eps_abs: Mapped[float] = mapped_column(Float, default=0.001)
+    margin_pct: Mapped[float] = mapped_column(Float, default=0.1)
+    revenue_pct: Mapped[float] = mapped_column(Float, default=1.0)
+
+
 # --- financial data sources (agent fetchers) --------------------------------
 class DataSource(Base):
     """A financial-data feed the agents fetch from. Built-ins (sec_edgar,

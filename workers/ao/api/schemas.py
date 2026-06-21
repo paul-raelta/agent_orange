@@ -184,6 +184,15 @@ class FeatureFlags(WireBase):
     guidance: bool = True
 
 
+class ValidationThresholds(WireBase):
+    """Per-user tolerance bands for the validation stage. Two cross-document
+    sources must agree within these to count as corroborated (conf=high).
+    Anything outside flips the metric to a conflict and queues it for review."""
+    epsAbs: float = 0.001
+    marginPct: float = 0.1
+    revenuePct: float = 1.0
+
+
 # ---------------------------------------------------------------------------
 # Top-level entity payloads
 # ---------------------------------------------------------------------------

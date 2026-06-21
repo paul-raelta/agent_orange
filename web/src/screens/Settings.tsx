@@ -10,6 +10,7 @@ import {
   useDeleteDataSource,
   useFeatureFlags,
   useNotificationPrefs,
+  useValidationThresholds,
   usePatchDataSource,
   useProviders,
   usePutRouting,
@@ -27,6 +28,7 @@ import type {
   DataSourceKind,
   NotificationPrefs,
   TestDataSourceResult,
+  ValidationThresholds,
 } from '../types'
 
 const MODELS = ['Claude Haiku 4', 'Claude Sonnet 4', 'Claude Opus 4']
@@ -129,6 +131,8 @@ export function Settings() {
       </Panel>
 
       <FeatureFlagsPanel />
+
+      <ValidationThresholdsPanel />
 
       <DataSourcesPanel />
 
@@ -435,6 +439,125 @@ function FeatureFlagsPanel() {
         Off = the surface disappears; nothing else is touched. No restart, no
         migration. Backend skips disabled features — no estimate fetches, no
         guidance extraction, no workspace payload.
+      </p>
+    </Panel>
+  )
+}
+
+/* ----------------------------------------------------------------------- */
+/* VALIDATION THRESHOLDS — tolerance bands fed into the validation prompt. */
+/* Two cross-document sources must agree within these to count as          */
+/* corroborated (conf=high). Outside the band → conflict, queued for       */
+/* review. GAAP vs non-GAAP EPS always conflicts regardless of distance.   */
+/* ----------------------------------------------------------------------- */
+
+type ThreshKey = keyof ValidationThresholds
+
+const THRESH_DEFS: Array<{
+  key: ThreshKey
+  name: string
+  unit: string
+  desc: string
+  step: number
+  min: number
+}> = [
+  {
+    key: 'epsAbs',
+    name: 'EPS',
+    unit: '$',
+    desc: 'Two sources must agree within this dollar distance per share.',
+    step: 0.001,
+    min: 0,
+  },
+  {
+    key: 'marginPct',
+    name: 'Margins',
+    unit: '%',
+    desc: 'Gross / operating / net margin must agree within this percent.',
+    step: 0.05,
+    min: 0,
+  },
+  {
+    key: 'revenuePct',
+    name: 'Revenue / Net income',
+    unit: '%',
+    desc: 'Top-line and net income must agree within this percent.',
+    step: 0.1,
+    min: 0,
+  },
+]
+
+function ValidationThresholdsPanel() {
+  const { thresholds, saveThresholds, saving } = useValidationThresholds()
+  const [draft, setDraft] = useState<ValidationThresholds | null>(null)
+  useEffect(() => {
+    if (thresholds && !draft) setDraft(thresholds)
+  }, [thresholds, draft])
+
+  const current = draft ?? thresholds
+  const dirty =
+    !!draft &&
+    (draft.epsAbs !== thresholds.epsAbs ||
+      draft.marginPct !== thresholds.marginPct ||
+      draft.revenuePct !== thresholds.revenuePct)
+
+  return (
+    <Panel
+      title="VALIDATION — review thresholds"
+      right={
+        <span className="hint">
+          inside the band → corroborated · outside → queued for review
+        </span>
+      }
+    >
+      <div className="ff-list">
+        {THRESH_DEFS.map((t) => (
+          <div className="ff-row" key={t.key}>
+            <div className="ff-info">
+              <div className="ff-name">{t.name}</div>
+              <div className="ff-desc">{t.desc}</div>
+            </div>
+            <label className="thr-input">
+              <span className="thr-unit">{t.unit}</span>
+              <input
+                className="inp"
+                type="number"
+                inputMode="decimal"
+                step={t.step}
+                min={t.min}
+                value={current[t.key]}
+                onChange={(e) =>
+                  setDraft({
+                    ...current,
+                    [t.key]: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+      <div className="thr-actions">
+        <Btn
+          onClick={() => draft && saveThresholds(draft)}
+          disabled={!dirty || saving}
+        >
+          {saving ? 'SAVING…' : 'SAVE THRESHOLDS'}
+        </Btn>
+        <Btn
+          kind="ghost"
+          onClick={() =>
+            setDraft({ epsAbs: 0.001, marginPct: 0.1, revenuePct: 1.0 })
+          }
+          disabled={saving}
+        >
+          DEFAULTS
+        </Btn>
+      </div>
+      <p className="ff-note">
+        Bands feed straight into the validation prompt at run time. GAAP vs
+        non-GAAP EPS is always a conflict, regardless of distance — that
+        routing rule lives in the prompt itself, not in these numbers.
       </p>
     </Panel>
   )

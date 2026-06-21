@@ -14,6 +14,7 @@ from ao.agents import prompts
 from ao.agents.extraction import ExtractedMetric
 from ao.agents.registry import model_for
 from ao.agents.runlog import run_log
+from ao.api.serializers import serialize_validation_thresholds
 from ao.integrations import anthropic_client
 from ao.logging import get_logger
 
@@ -60,6 +61,12 @@ async def validate_metrics(
             return None
 
         model = await model_for(session, user_id, "validation")
+        thresholds = await serialize_validation_thresholds(session, user_id)
+        system_prompt = prompts.validation_system(
+            eps_abs=thresholds.epsAbs,
+            margin_pct=thresholds.marginPct,
+            revenue_pct=thresholds.revenuePct,
+        )
         payload = [
             {
                 "key": e.key, "value": e.display_value, "raw": e.raw_value,
@@ -71,7 +78,7 @@ async def validate_metrics(
 
         result: dict[str, Any] = await anthropic_client.complete(
             model=model,
-            system=prompts.VALIDATION_SYSTEM,
+            system=system_prompt,
             messages=[{"role": "user", "content": str(payload)}],
             tools=[prompts.VALIDATION_TOOL],
             tool_choice={"type": "tool", "name": "record_validation"},
