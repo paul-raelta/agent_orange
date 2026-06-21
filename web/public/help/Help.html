@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{var j=["https://claude.ai","https://preview.claude.ai"];var x=true;var S=30000;var f=3000;document.addEventListener("DOMContentLoaded",()=>{const H=window.Babel;const G="om-src-id";if(H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[G])){H.registerPlugin(G,({types:Y})=>({visitor:{JSXOpeningElement(U,Q){const J=U.node;if(J.name&&J.name.type==="JSXMemberExpression")return;for(let V=0;V<J.attributes.length;V++){const L=J.attributes[V];if(L.type==="JSXAttribute"&&L.name&&L.name.name==="data-om-id")return}const W=Q.file&&Q.file.opts&&Q.file.opts.filename||"?";const Z=J.loc&&J.loc.start;const z=`jsx:${W}:${J.start??0}:${Z?Z.line:0}:${Z?Z.column+1:0}`;J.attributes.push(Y.jsxAttribute(Y.jsxIdentifier("data-om-id"),Y.stringLiteral(z)))}}}))}const k="om-text-extract";let A=false;if(x&&H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[k])){const Y=window.React;if(Y&&Y.useSyncExternalStore&&Y.createElement){A=true;const U={};const Q=new Set;let J=0;window.__omTextO=U;window.__omTextSet=(z)=>{for(const V in z){const L=z[V];if(L==null)delete U[V];else U[V]=L}J++;Q.forEach((V)=>V())};const W=(z)=>{Q.add(z);return()=>Q.delete(z)};const Z=()=>J;window.__OmT=function z(V){Y.useSyncExternalStore(W,Z,Z);return Y.createElement("span",{"data-om-text":V.i,className:"__om-t"},V.i in U?U[V.i]:V.children)};H.registerPlugin(k,({types:z})=>{const V={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const L={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const _=($,C)=>z.logicalExpression("??",z.memberExpression(z.logicalExpression("||",z.memberExpression(z.identifier("window"),z.identifier("__omTextO")),z.objectExpression([])),z.stringLiteral($),true),C);const E=($)=>$.file&&$.file.opts&&$.file.opts.filename||"?";const B=($)=>$.file&&$.file.code||"";const b=($,C)=>{const X=(F)=>F&&F.start!=null&&F.end!=null&&(F.type==="StringLiteral"||F.type==="TemplateLiteral"&&F.expressions.length===0)?[F.start,F.end]:null;const N=X(C);if(N)return N;if(C&&C.type==="Identifier"){const F=$.scope.getBinding(C.name);if(F&&F.constant&&F.path.node.type==="VariableDeclarator"){return X(F.path.node.init)}}return null};const M=($,C,X)=>{const N=$.node;let F=false;const w=(K,q)=>{F=true;return z.jsxElement(z.jsxOpeningElement(z.jsxIdentifier("__OmT"),[z.jsxAttribute(z.jsxIdentifier("i"),z.stringLiteral(K))],false),z.jsxClosingElement(z.jsxIdentifier("__OmT")),[q],false)};const D=N.children.map((K)=>{if(K.type==="JSXText"){if(K.start==null||K.end==null)return K;const q=X.slice(K.start,K.end);const R=q.length-q.trimStart().length;const m=q.length-q.trimEnd().length;if(R+m>=q.length)return K;return w(`txt:${C}:${K.start+R}:${K.end-m}`,K)}if(K.type==="JSXExpressionContainer"){const q=b($,K.expression);if(q)return w(`str:${C}:${q[0]}:${q[1]}`,K)}return K});if(F)N.children=D};return{visitor:{JSXOpeningElement($,C){const X=$.node;const N=E(C);const F={};for(let w=0;w<X.attributes.length;w++){const D=X.attributes[w];if(D.type!=="JSXAttribute"||!D.name)continue;const K=D.name.name;if(!L[K])continue;if(!D.value||D.value.type!=="StringLiteral")continue;if(D.value.start==null||D.value.end==null)continue;const q=`txt:${N}:${D.value.start}:${D.value.end}`;F[K]=q;D.value=z.jsxExpressionContainer(_(q,z.stringLiteral(D.value.value)))}if(Object.keys(F).length){X.attributes.push(z.jsxAttribute(z.jsxIdentifier("data-om-text-attrs"),z.stringLiteral(JSON.stringify(F))))}},JSXElement($,C){const X=$.node.openingElement;const N=X&&X.name&&X.name.name;if(N==="__OmT")return;if(typeof N==="string"&&V[N])return;M($,E(C),B(C))},JSXFragment($,C){M($,E(C),B(C))}}}})}}const u=A?["transform-react-jsx-source",G,k]:["transform-react-jsx-source",G];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((Y,U)=>{const Q=Y.getAttribute("data-plugins")||"";const J=u.filter((W)=>Q.indexOf(W)<0);if(J.length){Y.setAttribute("data-plugins",Q?`${Q},${J.join(",")}`:J.join(","))}if(!Y.hasAttribute("data-filename")){Y.setAttribute("data-filename",Y.getAttribute("src")||`inline-${U}`)}})});var y=window.parent;if(y&&y!==window){const H=(Q,J)=>{try{y.postMessage({__omelette_log:true,type:Q,data:J},"*")}catch{}};["log","warn","error"].forEach((Q)=>{const J=console[Q];console[Q]=(...W)=>{const Z=W.map((z)=>{try{return typeof z==="object"?JSON.stringify(z):String(z)}catch{try{return String(z)}catch{return"[unstringifiable]"}}}).join(" ");H(Q,Z);J.apply(console,W)}});window.addEventListener("error",(Q)=>{const J=Q.target;if(J&&J!==window&&J.tagName){const W=J.src||J.href||"";H("resource_error",`${J.tagName} failed to load: ${W}`)}else{H("error",`${Q.message||"Unknown error"} at ${Q.filename||"?"}:${Q.lineno||0}:${Q.colno||0}`)}},true);window.addEventListener("unhandledrejection",(Q)=>{const J=Q.reason;const W=J instanceof Error?`${J.message} ${J.stack}`:String(J);H("error",`Unhandled rejection: ${W}`)});const G=()=>{try{y.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(document.readyState==="complete")G();else window.addEventListener("load",G);if(window.ResizeObserver)new ResizeObserver(G).observe(document.documentElement);const k={};let A=0;window.claude={complete(Q){return new Promise((J,W)=>{if(!j.length){W(new Error("claude.complete: no parent origin"));return}const Z=`c${++A}`;const z=()=>setTimeout(()=>{delete k[Z];W(new Error(`claude.complete: no data for ${S/1000}s`))},S);const V=z();k[Z]={resolve:J,reject:W,text:"",t:V,arm:z};try{for(const L of j){y.postMessage({__om_api:true,id:Z,body:Q},L)}}catch(L){clearTimeout(V);delete k[Z];W(L)}})}};const u={};let Y=0;window.omelette={writeFile:(Q,J)=>new Promise((W,Z)=>{if(!j.length){W();return}const z=`f${++Y}`;const V=setTimeout(()=>{delete u[z];W()},f);u[z]={resolve:W,reject:Z,t:V};try{for(const L of j){y.postMessage({__om_file:true,id:z,op:"write",path:Q,content:J},L)}}catch{clearTimeout(V);delete u[z];W()}})};const U=(Q)=>{try{return JSON.stringify(Q)}catch{return JSON.stringify(String(Q))}};window.addEventListener("message",(Q)=>{if(j.indexOf(Q.origin)<0)return;if(Q.source!==y)return;const J=Q.data;if(!J)return;if(J.type==="omelette-preview-refresh"){if(typeof J.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(J.token))return;const z=Math.max(1,Math.floor((J.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+J.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+z;return}if(J.__om_file_r){const z=u[J.id];if(!z)return;clearTimeout(z.t);delete u[J.id];if(J.ok)z.resolve();else z.reject(new Error(J.error||"write failed"));return}if(J.__om_api_r){const z=k[J.id];if(!z)return;if(J.error!=null){clearTimeout(z.t);delete k[J.id];z.reject(new Error(J.error));return}if(J.chunk!=null){clearTimeout(z.t);z.t=z.arm();z.text+=J.chunk;return}if(J.done){clearTimeout(z.t);delete k[J.id];z.resolve(J.text!=null?J.text:z.text);return}return}if(!J.__om_eval)return;const W=J;const Z=(z)=>{Q.source.postMessage({...z,__om_eval_r:1,id:W.id},Q.origin)};try{const z=(0,eval)(W.code);if(z&&typeof z.then==="function"){z.then((V)=>Z({ok:1,v:U(V)}),(V)=>Z({ok:0,e:String(V)}))}else{Z({ok:1,v:U(z)})}}catch(z){Z({ok:0,e:String(z)})}})}})();
+</script>
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Orange — Help & User Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#07090c; --panel:#0d1117; --panel-2:#11161d; --raised:#161d27;
+  --line:#222b37; --line-soft:#1a212b;
+  --text:#e4e8ee; --text-2:#929dac; --text-3:#5f6975;
+  --accent:#e8723a; --accent-soft:rgba(232,114,58,.13); --accent-line:rgba(232,114,58,.40);
+  --green:#4ec77a; --red:#ff6b5e; --amber:#e3a52e; --blue:#5aa2f0;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --r:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+b,strong{color:var(--text);font-weight:600}
+.t-green{color:var(--green)}.t-blue{color:var(--blue)}.t-amber{color:var(--amber)}.t-accent{color:var(--accent)}
+
+/* ===== layout ===== */
+.layout{display:flex;max-width:1280px;margin:0 auto;align-items:flex-start}
+.toc{position:sticky;top:0;height:100vh;flex:0 0 248px;border-right:1px solid var(--line);background:var(--panel);
+  padding:22px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.toc-brand{display:flex;align-items:center;gap:11px;padding:4px 8px 18px}
+.toc-mark{width:16px;height:16px;background:var(--accent);transform:rotate(45deg);box-shadow:0 0 14px rgba(232,114,58,.6);flex:0 0 auto}
+.toc-brand .bt{font-size:11px;letter-spacing:.18em;color:var(--text-2);line-height:1.25}
+.toc-brand .bt b{color:var(--text)}
+.toc-lbl{font-size:8.5px;letter-spacing:.16em;color:var(--text-3);text-transform:uppercase;padding:14px 10px 6px}
+.toc a{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:6px;color:var(--text-2);font-size:12px;transition:.12s}
+.toc a:hover{background:var(--panel-2);color:var(--text)}
+.toc a.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}
+.toc a .tn{font-size:9.5px;color:var(--text-3);min-width:16px;font-weight:600}
+.toc a.active .tn{color:var(--accent)}
+
+.main{flex:1;min-width:0;padding:0 0 80px}
+
+/* ===== hero ===== */
+.hero{position:relative;padding:64px 48px 52px;border-bottom:1px solid var(--line);overflow:hidden;
+  background:radial-gradient(120% 90% at 50% -10%, rgba(232,114,58,.14), transparent 60%), var(--bg)}
+.hero-eyebrow{font-size:10px;letter-spacing:.34em;color:var(--accent);font-weight:700;margin-bottom:18px}
+.hero h1{font-size:46px;letter-spacing:.04em;font-weight:700;line-height:1.05}
+.hero h1 .o{color:var(--accent)}
+.hero .lede{font-family:var(--sans);font-size:15px;color:var(--text-2);max-width:620px;margin-top:18px;line-height:1.6}
+.hero h1{max-width:680px}
+.hero-mark{position:absolute;right:70px;top:70%;transform:translateY(-50%) rotate(45deg);width:74px;height:74px;
+  background:var(--accent);box-shadow:0 0 60px rgba(232,114,58,.55);opacity:.9}
+@media(max-width:760px){.hero-mark{display:none}}
+
+/* intro band: the core loop */
+.intro{padding:40px 48px;border-bottom:1px solid var(--line)}
+.intro h2{font-size:14px;letter-spacing:.1em;margin-bottom:8px}
+.intro p{font-family:var(--sans);font-size:13.5px;color:var(--text-2);max-width:680px;line-height:1.65}
+.loop{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
+.loop-step{flex:1;min-width:150px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);padding:14px;position:relative}
+.loop-step .ls-n{font-size:9px;letter-spacing:.1em;color:var(--accent);font-weight:700}
+.loop-step .ls-k{font-size:12px;font-weight:700;letter-spacing:.05em;margin:5px 0 5px}
+.loop-step .ls-d{font-family:var(--sans);font-size:11px;color:var(--text-2);line-height:1.45}
+
+/* ===== section ===== */
+.section{padding:46px 48px;border-bottom:1px solid var(--line);scroll-margin-top:10px}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+.sec-num{font-size:13px;color:var(--accent);font-weight:700;letter-spacing:.05em}
+.sec-title{font-size:24px;letter-spacing:.02em;font-weight:700}
+.sec-tag{font-family:var(--sans);font-size:12px;color:var(--text-3);margin-left:auto;font-style:italic}
+.sec-intro{font-family:var(--sans);font-size:13.5px;color:var(--text-2);max-width:760px;line-height:1.65;margin:10px 0 26px}
+
+/* annotated figure */
+.figure{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#000;margin-bottom:8px}
+.figure .frame-bar{display:flex;align-items:center;gap:8px;padding:8px 13px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+.figure .fdots{display:flex;gap:5px}
+.figure .fdots i{width:8px;height:8px;border-radius:50%;background:var(--line);display:block}
+.figure .frame-lbl{font-size:9.5px;letter-spacing:.12em;color:var(--text-3);font-weight:600}
+.figure .imgwrap{position:relative;line-height:0}
+.figure img{width:100%;display:block}
+.figure.contain{background:var(--bg)}
+.figure.contain .imgwrap{max-width:520px;margin:0 auto}
+
+/* pins */
+.pin{position:absolute;transform:translate(-50%,-50%);width:23px;height:23px;border-radius:50%;
+  background:var(--accent);color:#08090b;font-size:11px;font-weight:700;display:grid;place-items:center;
+  box-shadow:0 0 0 3px rgba(232,114,58,.28), 0 2px 6px rgba(0,0,0,.5);z-index:2;font-family:var(--mono);
+  cursor:default;transition:transform .12s}
+.pin:hover{transform:translate(-50%,-50%) scale(1.18);z-index:3}
+.pin.lit{box-shadow:0 0 0 4px rgba(232,114,58,.5), 0 2px 10px rgba(0,0,0,.6)}
+.fig-cap{font-family:var(--sans);font-size:11px;color:var(--text-3);text-align:center;margin:10px 0 0;font-style:italic}
+
+/* callouts */
+.callouts{display:grid;grid-template-columns:1fr 1fr;gap:9px 18px;margin-top:24px}
+.callout{display:flex;gap:11px;padding:10px;border-radius:7px;transition:.12s;border:1px solid transparent}
+.callout:hover{background:var(--panel-2);border-color:var(--line)}
+.co-n{flex:0 0 21px;height:21px;border-radius:50%;background:var(--accent-soft);border:1px solid var(--accent-line);
+  color:var(--accent);font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.co-b .co-t{font-size:12px;font-weight:600;margin-bottom:2px}
+.co-b .co-d{font-family:var(--sans);font-size:11.5px;color:var(--text-2);line-height:1.5}
+
+/* how-to */
+.howto{margin-top:24px;border:1px solid var(--accent-line);border-radius:9px;background:linear-gradient(180deg,var(--accent-soft),transparent);padding:16px 18px}
+.howto-h{font-size:10px;letter-spacing:.13em;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.howto ol{list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:9px}
+.howto li{counter-increment:s;display:flex;gap:11px;font-family:var(--sans);font-size:12.5px;color:var(--text);align-items:baseline}
+.howto li::before{content:counter(s);flex:0 0 19px;height:19px;border-radius:50%;background:var(--accent);color:#08090b;
+  font-family:var(--mono);font-size:10px;font-weight:700;display:grid;place-items:center;align-self:flex-start}
+.note{margin-top:20px;font-family:var(--sans);font-size:12px;color:var(--text-2);border-left:2px solid var(--accent-line);
+  padding:8px 0 8px 14px;line-height:1.55}
+.subhead{font-size:11px;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;font-weight:600;margin:34px 0 16px;
+  display:flex;align-items:center;gap:10px}
+.subhead::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* examiner diagram */
+.pipeline{display:flex;gap:0;margin:8px 0 30px;flex-wrap:wrap}
+.pl-step{flex:1;min-width:140px;position:relative;padding:16px 14px;border:1px solid var(--line);background:var(--panel-2);
+  border-right:none}
+.pl-step:first-child{border-radius:var(--r) 0 0 var(--r)}
+.pl-step:last-child{border-right:1px solid var(--line);border-radius:0 var(--r) var(--r) 0}
+.pl-step .pn{font-size:9px;color:var(--accent);font-weight:700;letter-spacing:.1em}
+.pl-step .pk{font-size:13px;font-weight:700;letter-spacing:.04em;margin:6px 0}
+.pl-step .pd{font-family:var(--sans);font-size:11px;color:var(--text-2);line-height:1.45}
+.pl-step .arr{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;color:var(--accent);font-size:14px;background:var(--bg);padding:2px 0}
+.pl-step:last-child .arr{display:none}
+.anatomy{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.an-row{display:flex;gap:13px;padding:14px 16px;background:var(--panel)}
+.an-row .an-i{flex:0 0 26px;height:26px;border-radius:7px;background:var(--accent-soft);border:1px solid var(--accent-line);
+  color:var(--accent);font-weight:700;display:grid;place-items:center;font-size:12px}
+.an-row .an-t{font-size:12.5px;font-weight:600;margin-bottom:3px}
+.an-row .an-d{font-family:var(--sans);font-size:11.5px;color:var(--text-2);line-height:1.5}
+
+.foot{padding:40px 48px;text-align:center}
+.foot p{font-family:var(--sans);font-size:12px;color:var(--text-3)}
+.totop{display:inline-block;margin-top:14px;font-size:10px;letter-spacing:.1em;color:var(--text-2);border:1px solid var(--line);
+  border-radius:20px;padding:7px 15px}
+.totop:hover{color:var(--accent);border-color:var(--accent-line)}
+
+@media(max-width:920px){
+  .toc{display:none}
+  .callouts{grid-template-columns:1fr}
+  .hero,.intro,.section,.foot{padding-left:24px;padding-right:24px}
+  .hero h1{font-size:34px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" id="toc">
+    <div class="toc-brand"><span class="toc-mark"></span><span class="bt">AGENT<br><b>ORANGE</b></span></div>
+    <div class="toc-lbl">User Guide</div>
+    <a href="#top" class="t<!-- -->op-link"><span class="tn">◆</span> Overview</a>
+    <div id="toc-list"></div>
+  </nav>
+  <main class="main">
+    <header class="hero" id="top">
+      <div class="hero-eyebrow">USER GUIDE</div>
+      <h1>Agent <span class="o">Orange</span> Help</h1>
+      <p class="lede">Autonomous earnings intelligence — your investing desk, on autopilot. This guide walks through
+        every feature of the tool, with annotated screenshots pointing out each important component and a short
+        “how to use it” for each.</p>
+      <span class="hero-mark"></span>
+    </header>
+
+    <section class="intro">
+      <h2>What Agent Orange does</h2>
+      <p>You keep a watchlist of companies. Agent Orange assigns an <b>AI agent</b> to each one, and that agent
+        runs the same five-step loop every reporting season — so you get validated numbers, with receipts, the
+        moment results drop.</p>
+      <div class="loop">
+        <div class="loop-step"><div class="ls-n">STEP 1</div><div class="ls-k">Locate</div><div class="ls-d">Find where this company’s results live — its IR site + SEC EDGAR.</div></div>
+        <div class="loop-step"><div class="ls-n">STEP 2</div><div class="ls-k">Monitor</div><div class="ls-d">Poll on a cadence that intensifies inside the predicted filing window.</div></div>
+        <div class="loop-step"><div class="ls-n">STEP 3</div><div class="ls-k">Extract</div><div class="ls-d">Pull the figures that move trades: revenue, net income, EPS, margins.</div></div>
+        <div class="loop-step"><div class="ls-n">STEP 4</div><div class="ls-k">Validate</div><div class="ls-d">Cross-reference each figure; agreement earns confidence.</div></div>
+        <div class="loop-step"><div class="ls-n">STEP 5</div><div class="ls-k">Surface</div><div class="ls-d">Show it with full provenance; route conflicts to you.</div></div>
+      </div>
+    </section>
+
+    <div id="sections"></div>
+
+    <footer class="foot">
+      <p>That’s the whole tool. Every number you see links back to the document it came from — that’s the point of Agent Orange.</p>
+      <a href="#top" class="totop">↑ BACK TO TOP</a>
+    </footer>
+  </main>
+</div>
+
+<script src="helpdata.js"></script>
+<script>
+const esc = (s) => s; // content is trusted (authored above)
+const pins = (arr) => arr.map(p => `<div class="pin" data-n="${p.n}" style="left:${p.x}%;top:${p.y}%">${p.n}</div>`).join('');
+const callouts = (arr) => arr.map(c => `
+  <div class="callout" data-n="${c.n}">
+    <div class="co-n">${c.n}</div>
+    <div class="co-b"><div class="co-t">${c.title}</div><div class="co-d">${c.text}</div></div>
+  </div>`).join('');
+const howto = (arr) => `<div class="howto"><div class="howto-h">▸ How to use it</div><ol>${arr.map(s=>`<li>${s}</li>`).join('')}</ol></div>`;
+
+function figure(o){
+  return `<div class="figure${o.contain?' contain':''}">
+    <div class="frame-bar"><span class="fdots"><i></i><i></i><i></i></span><span class="frame-lbl">${o.frame||''}</span></div>
+    <div class="imgwrap">${pins(o.pins)}<img src="${o.img}" alt="${o.frame||''}" loading="lazy" /></div>
+  </div>${o.caption?`<div class="fig-cap">${o.caption}</div>`:''}`;
+}
+
+function renderSection(s){
+  let body;
+  if(s.type === 'diagram'){
+    body = `
+      <div class="pipeline">${s.pipeline.map(p=>`
+        <div class="pl-step"><div class="pn">${p.k}</div><div class="pk">${p.k}</div><div class="pd">${p.d}</div><span class="arr">▸</span></div>`).join('')}</div>
+      <div class="subhead">Anatomy of the run</div>
+      <div class="anatomy">${s.anatomy.map((a,i)=>`
+        <div class="an-row"><div class="an-i">${i+1}</div><div><div class="an-t">${a.title}</div><div class="an-d">${a.text}</div></div></div>`).join('')}</div>
+      ${howto(s.howto)}`;
+  } else {
+    body = `${figure(s)}<div class="callouts">${callouts(s.callouts)}</div>`;
+    if(s.extra){
+      body += `<div class="subhead">${s.extra.frame||'Detail'}</div>${figure(s.extra)}<div class="callouts">${callouts(s.extra.callouts)}</div>${howto(s.extra.howto)}`;
+    }
+    body += howto(s.howto);
+    if(s.note) body += `<div class="note">${s.note}</div>`;
+  }
+  return `<section class="section" id="${s.id}">
+    <div class="sec-head"><span class="sec-num">${s.num}</span><h2 class="sec-title">${s.title}</h2><span class="sec-tag">${s.tagline}</span></div>
+    <p class="sec-intro">${s.intro}</p>
+    ${body}
+  </section>`;
+}
+
+const data = window.HELP_SECTIONS;
+document.getElementById('sections').innerHTML = data.map(renderSection).join('');
+document.getElementById('toc-list').innerHTML = data.map(s=>`<a href="#${s.id}" data-id="${s.id}"><span class="tn">${s.num}</span> ${s.title}</a>`).join('');
+
+/* pin ↔ callout hover linking */
+document.querySelectorAll('.section').forEach(sec=>{
+  const link = (n,on)=>{
+    sec.querySelectorAll(`.pin[data-n="${n}"]`).forEach(p=>p.classList.toggle('lit',on));
+    sec.querySelectorAll(`.callout[data-n="${n}"]`).forEach(c=>c.style.background = on?'var(--panel-2)':'');
+  };
+  sec.querySelectorAll('.callout').forEach(c=>{
+    c.addEventListener('mouseenter',()=>link(c.dataset.n,true));
+    c.addEventListener('mouseleave',()=>link(c.dataset.n,false));
+  });
+  sec.querySelectorAll('.pin').forEach(p=>{
+    p.addEventListener('mouseenter',()=>link(p.dataset.n,true));
+    p.addEventListener('mouseleave',()=>link(p.dataset.n,false));
+  });
+});
+
+/* scroll-spy TOC */
+const links = [...document.querySelectorAll('#toc-list a')];
+const map = {};
+links.forEach(a=>map[a.dataset.id]=a);
+const obs = new IntersectionObserver((es)=>{
+  es.forEach(e=>{ if(e.isIntersecting){ links.forEach(l=>l.classList.remove('active')); map[e.target.id]?.classList.add('active'); } });
+},{rootMargin:'-20% 0px -70% 0px'});
+data.forEach(s=>{ const el=document.getElementById(s.id); if(el) obs.observe(el); });
+</script>
+</body>
+</html>

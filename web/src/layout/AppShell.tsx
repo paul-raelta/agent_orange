@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { keys, useCompanies, useReviewQueue, useRunAll, useUsage } from '../hooks'
+import { CountUp } from '../motion/motion'
 import { TweaksPanel } from '../theme/TweaksPanel'
 import type { RunFeedback, ShellContext } from './shellContext'
 
@@ -24,13 +25,25 @@ declare global {
   }
 }
 
-const NAV = [
+type NavItem = {
+  to: string
+  label: string
+  icon: string
+  end?: boolean
+  external?: boolean
+}
+
+const NAV: NavItem[] = [
   { to: '/', label: 'Watchlist', icon: '▦', end: true },
   { to: '/timeline', label: 'Timeline', icon: '▭' },
   { to: '/review', label: 'Review', icon: '⚑' },
   { to: '/companies', label: 'Companies', icon: '≣' },
   { to: '/activity', label: 'Activity', icon: '≁' },
   { to: '/settings', label: 'Settings', icon: '⚙' },
+  // Help is a self-contained static page in /public/help (vanilla HTML + JS +
+  // annotated screenshots). NavLink would treat it as a SPA route and miss the
+  // file; render as a plain <a> with target=_blank so the user keeps app state.
+  { to: '/help/Help.html', label: 'Help', icon: '?', external: true },
 ]
 
 const FEEDBACK_KEY = 'ao-run-feedback'
@@ -85,6 +98,11 @@ export function AppShell() {
 
   function runAll() {
     if (running) return
+    const tickers = (companies ?? []).map((c) => c.ticker)
+    if (!tickers.length) {
+      setToast('Add a ticker to your watchlist first.')
+      return
+    }
     // Play the Document Examiner overlay alongside the backend kickoff. The
     // engine examines each watchlist ticker in sequence (~9.5s/chapter), then
     // refreshes companies so freshly extracted figures land on the watchlist.
@@ -92,9 +110,8 @@ export function AppShell() {
       window.onAgentRunComplete = () => {
         qc.invalidateQueries({ queryKey: keys.companies })
       }
-      const tickers = (companies ?? []).map((c) => c.ticker)
       window.AgentRun.reset()
-      window.AgentRun.start(tickers.length ? tickers : undefined)
+      window.AgentRun.start(tickers)
     }
     runAllMutation.mutate(undefined, {
       onSuccess: (res) => {
@@ -127,21 +144,35 @@ export function AppShell() {
           </span>
         </div>
         <ul className="nav-list">
-          {NAV.map((n) => (
-            <li key={n.to}>
-              <NavLink
-                to={n.to}
-                end={n.end}
-                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
-              >
-                <span className="nav-icon">{n.icon}</span>
-                <span className="nav-label">{n.label}</span>
-                {n.label === 'Review' && reviewCount > 0 && (
-                  <span className="nav-badge">{reviewCount}</span>
-                )}
-              </NavLink>
-            </li>
-          ))}
+          {NAV.map((n) =>
+            n.external ? (
+              <li key={n.to}>
+                <a
+                  href={n.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nav-item"
+                >
+                  <span className="nav-icon">{n.icon}</span>
+                  <span className="nav-label">{n.label}</span>
+                </a>
+              </li>
+            ) : (
+              <li key={n.to}>
+                <NavLink
+                  to={n.to}
+                  end={n.end}
+                  className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}
+                >
+                  <span className="nav-icon">{n.icon}</span>
+                  <span className="nav-label">{n.label}</span>
+                  {n.label === 'Review' && reviewCount > 0 && (
+                    <span className="nav-badge">{reviewCount}</span>
+                  )}
+                </NavLink>
+              </li>
+            )
+          )}
         </ul>
         <div className="nav-foot">
           <div className="nav-usage">
@@ -153,8 +184,9 @@ export function AppShell() {
               <span style={{ width: '37%' }} />
             </div>
             <div className="nu-lab">
-              ${usage ? usage.monthCost.toFixed(0) : '–'} / ${usage ? usage.budget : '–'} ·{' '}
-              {usage ? usage.monthTokens : '–'}M tok
+              {usage ? <CountUp value={usage.monthCost} prefix="$" decimals={0} /> : '$–'}
+              {' / '}${usage ? usage.budget : '–'} ·{' '}
+              {usage ? <CountUp value={usage.monthTokens} decimals={0} suffix="M tok" /> : '–M tok'}
             </div>
           </div>
         </div>
