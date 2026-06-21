@@ -56,3 +56,7 @@ test-results/
 playwright-report/
 .playwright/
 workers/var/ao.test.db*
+
+# session handoff scratch
+.handoff/
+*-handoff.sh
