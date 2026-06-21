@@ -10,7 +10,7 @@ these to compute per-call USD cost.
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo paths — everything else hangs off WORKERS_ROOT so the daemon doesn't
@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     database_url: str = Field(
         f"sqlite+aiosqlite:///{VAR_DIR / 'ao.db'}", alias="DATABASE_URL"
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _coerce_async_driver(cls, v: str) -> str:
+        # Railway/Heroku inject DATABASE_URL with the libpq scheme. SQLAlchemy
+        # async needs an explicit async driver — swap it in transparently so
+        # the platform-provided value Just Works.
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                v = "postgresql+asyncpg://" + v[len("postgres://"):]
+            elif v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
+                v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+        return v
 
     # --- Scheduler ---
     # inproc = APScheduler runs locally (this process or the ao-daemon process)

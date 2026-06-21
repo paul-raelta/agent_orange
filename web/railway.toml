@@ -1,0 +1,19 @@
+# Railway service config — frontend (Vite static build, served via `serve`).
+# Set this service's Root Directory to `web` in the Railway dashboard.
+# watchPatterns are repo-rooted, so only changes under web/ trigger a redeploy.
+#
+# VITE_API_BASE is read at BUILD time and inlined into the JS bundle. Set it
+# in the service's env to the backend service's public URL + /api/v1, e.g.:
+#   VITE_API_BASE=https://agent-orange-api.up.railway.app/api/v1
+#
+# The run command comes from package.json's `start` script (`serve -s dist`)
+# so both Railpack and Nixpacks discover it identically. `serve -s` provides
+# the SPA fallback (every unknown path serves index.html) and reads $PORT
+# from the env automatically.
+
+[build]
+watchPatterns = ["web/**"]
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
