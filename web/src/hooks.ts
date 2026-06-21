@@ -68,6 +68,10 @@ export function useFeatureFlags() {
     queryKey: keys.featureFlags,
     queryFn: api.getFeatureFlags,
     initialData: initial,
+    // Mark initial-from-cache as already stale so React Query still refetches
+    // on mount — otherwise an empty / drifted cache locks the UI to the
+    // DEFAULT_FLAGS fallback for the full staleTime window.
+    initialDataUpdatedAt: 0,
     staleTime: 30_000,
   })
   const [localFlags, setLocalFlags] = useState<FeatureFlags>(initial)

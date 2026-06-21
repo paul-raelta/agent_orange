@@ -1,4 +1,4 @@
-.PHONY: setup seed dev api daemon web test build clean
+.PHONY: setup seed dev api daemon web test test-e2e build clean
 
 # One-time setup: Python venv + npm install
 setup:
@@ -35,5 +35,9 @@ test:
 build:
 	cd web && npm run build
 
+# Run the headless-browser smoke suite (Playwright auto-starts api+daemon+web)
+test-e2e:
+	npm run test:e2e
+
 clean:
-	rm -rf workers/.venv workers/var/ao.db* web/node_modules web/dist
+	rm -rf workers/.venv workers/var/ao.db* workers/var/ao.test.db* web/node_modules web/dist

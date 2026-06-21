@@ -1168,3 +1168,52 @@ None blocking. Future work: add a 👍/👎 feedback signal + an unanswered-
 question log to drive corpus updates (handoff §"Keep it grounded &
 improving").
 
+---
+
+## Increment — Playwright headless-browser smoke suite
+
+**Goal:** stop catching UI regressions only by eyeballing. Stand up a
+Playwright suite that drives the real app end-to-end against real APIs so
+breakage fails the build instead of needing a manual repro.
+
+**What landed (per `UI_TEST_PLAN.md`)**
+- `playwright.config.ts` at repo root — Chromium only, serial workers,
+  auto-spawns api+daemon+web with `DATABASE_URL` pointed at a throwaway
+  `workers/var/ao.test.db` so the real `ao.db` is never touched.
+- 9 specs under `tests/e2e/` (one per feature), 11 tests total, ~14 s
+  end-to-end. All 11 green on a fresh DB.
+- `tests/e2e/_setup.ts` — `wipeDb` / `addCompany` / `archive` / `restore`
+  helpers; each spec wipes in `beforeEach` so it starts from the demo NVDA
+  anchor. Spec 05 (review queue) additionally invokes `python -m ao.db.seed`
+  in `beforeAll` because wipe doesn't reseed review items.
+- Mobile-viewport pass folded into specs 01 + 04 (regression guard for the
+  iOS Safari bottom-nav fix in 4a6b1f5).
+- `npm run test:e2e` + `make test-e2e` targets, plus `.gitignore` entries
+  for `test-results/`, `playwright-report/`, `workers/var/ao.test.db*`.
+
+**Issues found and fixed by the suite**
+- `useFeatureFlags` had `initialData: readFlagsCache()` + `staleTime: 30_000`
+  with no `initialDataUpdatedAt`. If localStorage was empty or stale, React
+  Query treated the DEFAULT_FLAGS fallback as fresh for 30 s and never
+  refetched — so the LABS panel showed the wrong state until the user
+  toggled something. Set `initialDataUpdatedAt: 0` so initial-from-cache is
+  treated as stale and refetches on mount. `web/src/hooks.ts`.
+
+**Workarounds baked in**
+- Playwright 1.61 + Node 23 crashes on test discovery
+  (`context.conditions?.includes is not a function` in its ESM loader hook).
+  `scripts/patch-playwright.cjs` runs on `postinstall` to wrap the call site
+  with `Array.from(...)`. Idempotent. Drop when Playwright > 1.61 ships a
+  Node 23 fix.
+
+**Out of scope (per plan)**
+Cross-browser (Firefox/WebKit), Vitest/RTL component tests, CI wiring,
+deeper per-feature edge-case coverage, mocked/offline mode — all explicitly
+deferred to follow-ups.
+
+**Next step**
+None blocking. When CI is wired up: drop `reuseExistingServer` (already
+gated on `!CI`) and pre-install chromium in the workflow image. Keep
+considering whether `wipe()` should reseed review items so spec 05 can stop
+shelling out to Python.
+

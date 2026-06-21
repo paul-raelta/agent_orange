@@ -50,3 +50,9 @@ workers/*.db
 workers/*.db-journal
 workers/*.db-wal
 workers/*.db-shm
+
+# playwright
+test-results/
+playwright-report/
+.playwright/
+workers/var/ao.test.db*
