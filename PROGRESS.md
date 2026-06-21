@@ -1125,3 +1125,46 @@ Visual QA: `/company/<ticker>` → ARCHIVE → `/companies` → ARCHIVED → cli
 PERMANENTLY DELETE, double-confirm. The row should disappear immediately
 from both panels; `GET /api/v1/companies/<ticker>` returns 404.
 
+---
+
+## Feature — In-app Help Assistant (grounded chat agent)
+
+**Goal:** ship a friendly chat panel reachable on every screen that answers
+questions about using the app — grounded in a verified corpus so it never
+invents features and never gives investment advice.
+
+**Decisions**
+- Corpus lives in two places by necessity (Python prompt + JS prototype) but
+  with a "keep in sync" header. Python is the source the LLM actually sees;
+  the prototype `design/help/agent/knowledge.js` is the human spec.
+- Streaming POST (not GET EventSource) because the corpus is ~18 KB and we
+  need it in the request body; the client reads chunks via a
+  `ReadableStream` reader and parses SSE frames manually.
+- New `help` routing stage pinned to Haiku via settings — Q&A doesn't need
+  Opus, and grounding makes a small model accurate enough.
+- Real Anthropic call wired; without a key, the route falls back to a
+  canned friendly reply so dev still works.
+
+**Current state**
+- Backend: `workers/ao/help/{knowledge,prompt}.py` + `routes_help.py`
+  registered at `/api/v1/help/ask`. Verified live with the configured
+  Anthropic key — acceptance scenarios (advice / off-topic / made-up
+  feature / add-a-company) all pass.
+- Frontend: `web/src/help/{HelpAgent,stream,screen,starters}.tsx?` mounted
+  in `AppShell`. Launcher persists open/closed in localStorage; the
+  current route auto-fills the `screen` field; streamed deltas render
+  token by token.
+- `npm run build` clean (110 modules).
+
+**Files touched**
+- `workers/ao/help/{__init__,knowledge,prompt}.py` (new)
+- `workers/ao/api/routes_help.py` (new)
+- `workers/ao/{main,config}.py` and `workers/ao/agents/registry.py`
+- `web/src/help/{HelpAgent.tsx,stream.ts,screen.ts,starters.ts}` (new)
+- `web/src/layout/AppShell.tsx`, `web/src/styles/app.css`
+
+**Next step**
+None blocking. Future work: add a 👍/👎 feedback signal + an unanswered-
+question log to drive corpus updates (handoff §"Keep it grounded &
+improving").
+
