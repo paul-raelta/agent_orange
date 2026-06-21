@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { HelpAgent } from '../help/HelpAgent'
 import { keys, useCompanies, useReviewQueue, useRunAll, useUsage } from '../hooks'
 import { CountUp } from '../motion/motion'
 import { TweaksPanel } from '../theme/TweaksPanel'
@@ -210,6 +211,11 @@ export function AppShell() {
       )}
 
       <TweaksPanel />
+
+      {/* Grounded in-app Help Assistant — floating launcher reachable on every
+          screen. Posts to /help/ask, which streams a reply assembled from the
+          help corpus (workers/ao/help/knowledge.py). */}
+      <HelpAgent />
     </div>
   )
 }

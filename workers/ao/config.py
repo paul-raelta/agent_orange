@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     default_model_extraction: str = "claude-opus-4-7"
     default_model_validation: str = "claude-opus-4-7"
     default_model_narrative: str = "claude-opus-4-7"
+    # Help Assistant — Q&A about the app itself. Cheap & fast; the KB already
+    # grounds it, so Haiku is plenty.
+    default_model_help: str = "claude-haiku-4-5-20251001"
 
     # --- Finnhub ---
     finnhub_api_key: str = Field("", alias="FINNHUB_API_KEY")

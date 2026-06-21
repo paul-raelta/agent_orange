@@ -72,6 +72,7 @@ def create_app() -> FastAPI:
         routes_companies,
         routes_events,
         routes_health,
+        routes_help,
         routes_news,
         routes_portfolio,
         routes_providers,
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_events.router, prefix=prefix)
     app.include_router(routes_admin.router, prefix=prefix)
     app.include_router(routes_universe.router, prefix=prefix)
+    app.include_router(routes_help.router, prefix=prefix)
 
     return app
 
