@@ -2,21 +2,28 @@
    findings the agent couldn't auto-validate. Resolve is optimistic (§7). */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Btn, Conf, Panel, ProvenanceItem } from '../components/primitives'
+import { Btn, Conf, Glyph, Panel, ProvenanceItem } from '../components/primitives'
 import { Loading } from '../components/Loading'
-import { useResolveReview, useReviewQueue } from '../hooks'
+import { Reveal } from '../motion/motion'
+import { useFeatureFlags, useResolveReview, useReviewQueue } from '../hooks'
+import type { ConflictSourceId, ReviewConflict, ReviewItem as ReviewItemT } from '../types'
 
 export function Review() {
   const { data: items } = useReviewQueue()
   const navigate = useNavigate()
   const resolveMutation = useResolveReview()
+  const { flags } = useFeatureFlags()
   const [resolved, setResolved] = useState<Record<string, string>>({})
 
   if (!items) return <Loading title="REVIEW QUEUE" />
 
-  function resolve(id: string, choice: string) {
+  function resolve(
+    id: string,
+    choice: string,
+    extras?: { note?: string; pinnedValue?: string },
+  ) {
     setResolved((r) => ({ ...r, [id]: choice })) // optimistic
-    resolveMutation.mutate({ id, choice })
+    resolveMutation.mutate({ id, choice, ...(extras ?? {}) })
   }
 
   const pending = items.filter((i) => !resolved[i.id])
@@ -41,9 +48,21 @@ export function Review() {
         </Panel>
       )}
 
-      <div className="rv-list">
+      <Reveal className="rv-list">
         {items.map((it) => {
           const done = resolved[it.id]
+          // Conflict-workspace fork: flag on AND backend attached the rich
+          // conflict block. Falls through to the simple row otherwise.
+          if (flags.conflict && it.conflict && !done) {
+            return (
+              <ConflictWorkspaceItem
+                key={it.id}
+                item={it}
+                conflict={it.conflict}
+                onResolve={(choice, extras) => resolve(it.id, choice, extras)}
+              />
+            )
+          }
           return (
             <article key={it.id} className={'rv-card' + (done ? ' resolved' : '')}>
               <div className="rv-hd">
@@ -96,6 +115,128 @@ export function Review() {
             </article>
           )
         })}
+      </Reveal>
+    </div>
+  )
+}
+
+function ConflictWorkspaceItem({
+  item,
+  conflict,
+  onResolve,
+}: {
+  item: ReviewItemT
+  conflict: ReviewConflict
+  onResolve: (
+    choice: string,
+    extras: { note?: string; pinnedValue?: string },
+  ) => void
+}) {
+  const [choice, setChoice] = useState<ConflictSourceId | 'flag' | 'both-wrong' | null>(null)
+  const [note, setNote] = useState('')
+  const pickedSource = conflict.sources.find((src) => src.id === choice)
+  const needsNote = choice === 'flag' || choice === 'both-wrong'
+  const canResolve = choice !== null && (!needsNote || note.trim().length > 0)
+
+  return (
+    <div className="cw">
+      <div className="cw-hd">
+        <Glyph ticker={item.ticker} status="review" />
+        <div className="cw-hd-id">
+          <div className="cw-hd-tkr">
+            {item.ticker} · {conflict.metric}
+          </div>
+          <div className="cw-hd-sub">
+            {conflict.sources.length} sources disagree · {conflict.period}
+          </div>
+        </div>
+        <span className="cw-flag">⚑ NEEDS DECISION</span>
+      </div>
+      <div className="cw-diff">
+        {conflict.sources.map((src) => (
+          <div
+            key={src.id}
+            className={'cw-col' + (choice === src.id ? ' pick' : '')}
+            onClick={() => setChoice(src.id)}
+          >
+            <div className="cw-col-hd">
+              <span className="cw-srcpill">
+                <b>{src.kind}</b>
+                {src.label}
+              </span>
+              <Conf level={src.confidence} />
+            </div>
+            <div className="cw-val">{src.value}</div>
+            <div className="cw-snip">"{src.snippet}"</div>
+            {src.url && (
+              <a
+                className="cw-link"
+                href={src.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {src.url} ↗
+              </a>
+            )}
+            {src.note && <div className="cw-note">{src.note}</div>}
+            <button
+              type="button"
+              className={'cw-pick' + (choice === src.id ? ' on' : '')}
+              onClick={(e) => {
+                e.stopPropagation()
+                setChoice(src.id)
+              }}
+            >
+              {choice === src.id ? '✓ ACCEPTED' : 'Accept ' + src.id}
+            </button>
+          </div>
+        ))}
+        {conflict.sources.length === 2 && <div className="cw-vs">VS</div>}
+      </div>
+      <div className="cw-rail">
+        <div className="cw-rail-actions">
+          <button
+            type="button"
+            className={'cw-act' + (choice === 'flag' ? ' on' : '')}
+            onClick={() => setChoice('flag')}
+          >
+            ⚑ Flag for analyst
+          </button>
+          <button
+            type="button"
+            className={'cw-act' + (choice === 'both-wrong' ? ' on' : '')}
+            onClick={() => setChoice('both-wrong')}
+          >
+            ✕ Both wrong
+          </button>
+        </div>
+        <input
+          type="text"
+          className="cw-noteinput"
+          placeholder={
+            needsNote
+              ? 'Decision note (required)…'
+              : 'Decision note (optional)…'
+          }
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <div className="cw-rail-bottom">
+          <button
+            type="button"
+            className="cw-act prim"
+            disabled={!canResolve}
+            onClick={() =>
+              onResolve(choice === null ? '' : choice, {
+                note: note.trim() || undefined,
+                pinnedValue: pickedSource?.value,
+              })
+            }
+          >
+            Resolve &amp; continue →
+          </button>
+        </div>
       </div>
     </div>
   )

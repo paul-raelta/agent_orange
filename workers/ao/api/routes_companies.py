@@ -9,9 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ao.api import schemas as s
 from ao.api.deps import current_user_id, get_db
 from ao.api.serializers import serialize_companies, serialize_company
+from ao.data.sp500_seed import SP500_SEED
 from ao.db import models as m
+from ao.notify import dispatcher
+from ao.notify.events import Event
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+# ticker → seed row (name/sector/price/dayChange/mcap/earn/earnDays). Used by
+# the batch-add path to populate a brand-new Company row before any agent
+# discovery has run.
+_SEED_BY_TICKER: dict[str, dict] = {row["ticker"]: row for row in SP500_SEED}
 
 
 def _now_iso() -> str:
@@ -36,6 +44,89 @@ async def list_companies(
     user_id: str = Depends(current_user_id),
 ):
     return await serialize_companies(db, user_id, archived=archived)
+
+
+@router.post("/batch", response_model=list[s.Company])
+async def add_companies_batch(
+    body: s.BatchAddRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(current_user_id),
+):
+    """START WATCHING ALL — bulk-create tracked Company rows from the
+    Add Companies flow. Idempotent: tickers already tracked (active or
+    archived) are skipped silently. `primaryIr[ticker]` pins the IR source
+    URL for tickers where discovery surfaced multiple candidates."""
+    existing = {
+        t for (t,) in (await db.execute(
+            select(m.Company.ticker).where(m.Company.user_id == user_id)
+        )).all()
+    }
+
+    created_rows: list[m.Company] = []
+    for raw in body.tickers:
+        ticker = raw.strip().upper()
+        if not ticker or ticker in existing:
+            continue
+        existing.add(ticker)
+
+        seed = _SEED_BY_TICKER.get(ticker, {})
+        name = seed.get("name") or ticker
+        sector = seed.get("sector") or ""
+        ir_url = (body.primaryIr or {}).get(ticker) or ""
+        ir_label = (
+            ir_url.replace("https://", "").replace("http://", "").rstrip("/")
+            if ir_url else f"investors.{ticker.lower()}.com"
+        )
+
+        company = m.Company(
+            user_id=user_id,
+            ticker=ticker,
+            name=name,
+            sector=sector,
+            currency="USD",
+            cadence="Quarterly",
+            fiscal_note="",
+            status="watching",
+            source_mode="auto",
+            ir_url=ir_url or None,
+        )
+        db.add(company)
+        await db.flush()  # assign company.id so Source FKs resolve
+
+        db.add_all([
+            m.Source(
+                company_id=company.id, kind="IR",
+                label=ir_label, url=ir_url or None, is_primary=True,
+            ),
+            m.Source(
+                company_id=company.id, kind="SEC",
+                label=f"EDGAR · search “{ticker}”",
+            ),
+        ])
+
+        # Seed an initial Price row so portfolio math + the watchlist row
+        # show a non-zero price until the price-refresh job catches up.
+        seed_price = float(seed.get("price") or 0.0)
+        seed_dc = float(seed.get("dayChange") or 0.0)
+        if seed_price > 0:
+            db.add(m.Price(
+                company_id=company.id, ts=_now_iso(),
+                price=seed_price, day_change=seed_dc,
+            ))
+
+        created_rows.append(company)
+
+    if created_rows:
+        await db.commit()
+        for c in created_rows:
+            await db.refresh(c)
+        # SSE fan-out — UI invalidates companies + watchlist on each event.
+        for c in created_rows:
+            await dispatcher.dispatch(
+                Event(type="company.updated", ticker=c.ticker)
+            )
+
+    return [await serialize_company(db, c) for c in created_rows]
 
 
 @router.get("/{ticker}", response_model=s.Company)
@@ -66,6 +157,25 @@ async def patch_company(
     await db.commit()
     await db.refresh(row)
     return await serialize_company(db, row, include_news=True)
+
+
+@router.get("/{ticker}/guidance", response_model=list[s.GuidanceItem])
+async def get_guidance(
+    ticker: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(current_user_id),
+):
+    """Forward-guidance for one ticker. Gated on flags.guidance — when the
+    flag is off this endpoint short-circuits to `[]` so the backend does no
+    extraction work for a disabled feature."""
+    from ao.api.serializers import serialize_feature_flags
+    from ao.integrations.guidance_provider import guidance_for
+
+    await _load(db, user_id, ticker)
+    flags = await serialize_feature_flags(db, user_id)
+    if not flags.guidance:
+        return []
+    return guidance_for(ticker)
 
 
 @router.get("/{ticker}/sources", response_model=list[s.CompanyDataSource])
@@ -230,6 +340,11 @@ async def delete_company(
     plus review_candidates → review_items → results (metrics cascade) →
     filings → provenance → prices → news → insider_tx → agent_runs.
     """
+    if ticker.upper() == "NVDA":
+        raise HTTPException(
+            409,
+            "NVDA is the demo anchor and can't be permanently deleted. Archive is allowed.",
+        )
     row = await _load(db, user_id, ticker)
     if row.archived_at is None:
         raise HTTPException(

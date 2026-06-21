@@ -47,25 +47,27 @@ async def _broadcast(event: Event) -> None:
 
 
 # --- channel dispatch -------------------------------------------------------
-async def _channels_for(event: Event) -> tuple[bool, bool]:
-    """Return (send_email, send_sms) based on this user's NotificationPrefs."""
+async def _channels_for(event: Event) -> tuple[bool, bool, str, str]:
+    """Return (send_email, send_sms, email_to, phone_to) from the user's
+    NotificationPrefs row — the same row the Settings screen writes to.
+    """
     user_id = get_settings().user_id
     Session = get_sessionmaker()
     async with Session() as session:
         prefs = await session.get(m.NotificationPref, user_id)
     if prefs is None:
-        return False, False
+        return False, False, "", ""
 
     if event.type == "validated" and not prefs.on_validated:
-        return False, False
+        return False, False, "", ""
     if event.type == "review.added" and not prefs.on_review:
-        return False, False
+        return False, False, "", ""
     if event.type == "watching_started" and not prefs.on_watching_started:
-        return False, False
+        return False, False, "", ""
     if event.type == "budget_80" and not prefs.on_budget_80:
-        return False, False
+        return False, False, "", ""
 
-    return prefs.email_enabled, prefs.sms_enabled
+    return prefs.email_enabled, prefs.sms_enabled, prefs.email, prefs.phone
 
 
 def _subject_and_body(event: Event) -> tuple[str, str]:
@@ -109,18 +111,23 @@ async def dispatch(event: Event) -> None:
     if event.type in ("company.updated", "run.progress"):
         return
 
-    email_on, sms_on = await _channels_for(event)
+    email_on, sms_on, email_to, phone_to = await _channels_for(event)
     if not email_on and not sms_on:
         return
 
-    subj, body = _subject_and_body(event)
+    # Fall back to env-configured address only if the user hasn't set one in
+    # the Settings screen. The prefs row is the source of truth.
     settings = get_settings()
+    email_to = email_to or settings.user_email
+    phone_to = phone_to or settings.user_phone
 
-    if email_on:
+    subj, body = _subject_and_body(event)
+
+    if email_on and email_to:
         await asyncio.to_thread(
-            gmail_smtp.send, to=settings.user_email, subject=subj, body_text=body,
+            gmail_smtp.send, to=email_to, subject=subj, body_text=body,
         )
-    if sms_on:
+    if sms_on and phone_to:
         await asyncio.to_thread(
-            twilio_client.send_sms, to=settings.user_phone, body=f"{subj}\n{body}",
+            twilio_client.send_sms, to=phone_to, body=f"{subj}\n{body}",
         )

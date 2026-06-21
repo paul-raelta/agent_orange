@@ -45,13 +45,22 @@ async def _latest_price(session: AsyncSession, company_id: str) -> tuple[float, 
 
 
 async def serialize_company(
-    session: AsyncSession, c: m.Company, *, include_news: bool = False,
+    session: AsyncSession,
+    c: m.Company,
+    *,
+    include_news: bool = False,
+    flags: s.FeatureFlags | None = None,
 ) -> s.Company:
     """Build the wire-format Company for one ORM row.
 
     `include_news=True` is the deep-dive path (GET /companies/{ticker}); the
     list path (GET /companies) keeps payloads small by omitting news+insider.
+    `flags` gates LABS earnings features — when omitted we load the user's
+    flags (route-level callers should pre-load and pass through to avoid
+    re-querying per company).
     """
+    if flags is None:
+        flags = await serialize_feature_flags(session, c.user_id)
     # --- sources --------------------------------------------------------
     src_rows = (await session.execute(
         select(m.Source).where(m.Source.company_id == c.id)
@@ -96,6 +105,11 @@ async def serialize_company(
                 .where(m.Provenance.metric_id == mr.id)
                 .order_by(m.Provenance.rank)
             )).scalars().all()
+            consensus = None
+            if flags.consensus:
+                # Only fetch / attach when the flag is on — backend stays lazy.
+                from ao.integrations.consensus_provider import consensus_for
+                consensus = consensus_for(c.ticker, mr.key, float(mr.raw_value or 0))
             metrics.append(s.Metric(
                 key=mr.key, value=mr.display_value, raw=mr.raw_value,
                 yoy=mr.yoy, conf=mr.conf,  # type: ignore[arg-type]
@@ -103,6 +117,7 @@ async def serialize_company(
                     s.Provenance(source=p.source_label, url=p.url, page=p.page, quote=p.quote)
                     for p in prov_rows
                 ],
+                consensus=consensus,
             ))
 
     # --- history (last 5 results) + sparkline ---------------------------
@@ -216,7 +231,8 @@ async def serialize_companies(
     else:
         q = q.where(m.Company.archived_at.is_(None))
     rows = (await session.execute(q.order_by(m.Company.ticker))).scalars().all()
-    return [await serialize_company(session, c) for c in rows]
+    flags = await serialize_feature_flags(session, user_id)
+    return [await serialize_company(session, c, flags=flags) for c in rows]
 
 
 async def serialize_portfolio_totals(
@@ -246,6 +262,46 @@ async def serialize_portfolio_totals(
 # ---------------------------------------------------------------------------
 
 
+def _infer_source_kind(source_label: str) -> str:
+    """SEC vs IR — heuristic on the candidate's source label."""
+    s_lower = (source_label or "").lower()
+    sec_markers = ("8-k", "10-k", "10-q", "edgar", "exhibit 99", "form ")
+    if any(marker in s_lower for marker in sec_markers):
+        return "SEC"
+    return "IR"
+
+
+def _build_conflict(
+    rv: m.ReviewItem,
+    candidates: list[m.ReviewCandidate],
+) -> s.ReviewConflict | None:
+    """Derive the rich Conflict workspace payload from the existing candidate
+    rows. Returns None when there aren't at least two competing sources —
+    the simple Confirm/Flag review row remains the right UI in that case."""
+    if len(candidates) < 2:
+        return None
+    # Map the first two candidates to A / B. Confidence is implied from rank /
+    # source weight: rank 0 (the primary) gets 'high', rank 1 gets 'med'.
+    conf_map: list[str] = ["high", "med", "low"]
+    sources: list[s.ConflictSource] = []
+    for i, cand in enumerate(candidates[:2]):
+        sid = "A" if i == 0 else "B"
+        kind = _infer_source_kind(cand.source)
+        sources.append(s.ConflictSource(
+            id=sid,  # type: ignore[arg-type]
+            kind=kind,  # type: ignore[arg-type]
+            label=cand.source or ("Form 10-Q" if kind == "SEC" else "Press release"),
+            url=rv.snippet_url or "",
+            value=cand.value,
+            snippet=rv.snippet_quote or cand.source,
+            confidence=conf_map[min(i, len(conf_map) - 1)],  # type: ignore[arg-type]
+            note=cand.weight or "",
+        ))
+    return s.ReviewConflict(
+        metric=rv.field, period=rv.period, sources=sources,
+    )
+
+
 async def serialize_review_queue(
     session: AsyncSession, user_id: str
 ) -> list[s.ReviewItem]:
@@ -255,6 +311,8 @@ async def serialize_review_queue(
         .order_by(desc(m.ReviewItem.found_on))
     )).scalars().all()
 
+    flags = await serialize_feature_flags(session, user_id)
+
     out: list[s.ReviewItem] = []
     for rv in rows:
         c = await session.get(m.Company, rv.company_id)
@@ -263,6 +321,7 @@ async def serialize_review_queue(
             .where(m.ReviewCandidate.review_item_id == rv.id)
             .order_by(m.ReviewCandidate.rank)
         )).scalars().all()
+        conflict = _build_conflict(rv, candidates) if flags.conflict else None
         out.append(s.ReviewItem(
             id=rv.id,
             ticker=c.ticker if c else "??",
@@ -277,6 +336,7 @@ async def serialize_review_queue(
                 source=rv.snippet_source, url=rv.snippet_url,
                 page=rv.snippet_page, quote=rv.snippet_quote,
             ),
+            conflict=conflict,
         ))
     return out
 
@@ -410,6 +470,17 @@ async def serialize_source_suggestions(
         .order_by(m.SourceSuggestion.submitted_at.desc())
     )).scalars().all()
     return [serialize_source_suggestion(r) for r in rows]
+
+
+async def serialize_feature_flags(
+    session: AsyncSession, user_id: str
+) -> s.FeatureFlags:
+    row = await session.get(m.FeatureFlag, user_id)
+    if row is None:
+        return s.FeatureFlags(consensus=True, conflict=True, guidance=True)
+    return s.FeatureFlags(
+        consensus=row.consensus, conflict=row.conflict, guidance=row.guidance,
+    )
 
 
 async def serialize_notification_prefs(

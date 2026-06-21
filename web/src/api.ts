@@ -12,6 +12,8 @@ import type {
   CreateSourceSuggestionRequest,
   DataSource,
   DiscoveryStatus,
+  FeatureFlags,
+  GuidanceItem,
   NewsItem,
   InsiderTx,
   NotificationPrefs,
@@ -24,8 +26,10 @@ import type {
   RunResponse,
   SourceSuggestion,
   TestDataSourceResult,
+  UniverseCompany,
   Usage,
 } from './types'
+import { SP500_UNIVERSE } from './data/sp500'
 
 // Default to the same hostname the UI was loaded from so LAN access works:
 // open http://<your-mac-ip>:5173 from your phone and the UI hits the API at
@@ -58,6 +62,15 @@ async function send<T>(
 /* --- API surface — 1:1 with workers/ao/api/routes_*.py ----------------- */
 
 export const api = {
+  // Add Companies — browse universe + batch-commit selection.
+  // /universe falls back to the bundled S&P 500 seed until the backend is up.
+  async getUniverse(): Promise<UniverseCompany[]> {
+    try { return await get<UniverseCompany[]>('/universe') }
+    catch { return SP500_UNIVERSE }
+  },
+  addCompanies: (body: { tickers: string[]; primaryIr?: Record<string, string> }) =>
+    send<Company[]>('POST', '/companies/batch', body),
+
   getCompanies: () => get<Company[]>('/companies'),
   getArchivedCompanies: () => get<Company[]>('/companies?archived=true'),
   getCompany: (ticker: string) => get<Company>(`/companies/${ticker}`),
@@ -107,6 +120,22 @@ export const api = {
   getNotificationPrefs: () => get<NotificationPrefs>('/settings/notifications'),
   putNotificationPrefs: (body: NotificationPrefs) =>
     send<NotificationPrefs>('PUT', '/settings/notifications', body),
+
+  // LABS feature flags
+  getFeatureFlags: () => get<FeatureFlags>('/settings/flags'),
+  putFeatureFlags: (body: FeatureFlags) =>
+    send<FeatureFlags>('PUT', '/settings/flags', body),
+
+  // Guidance — only fetched by the UI when flags.guidance is on.
+  getGuidance: (ticker: string) =>
+    get<GuidanceItem[]>(`/companies/${ticker}/guidance`),
+
+  // Rich resolve body for the Conflict workspace. The simple { choice } shape
+  // still works for the non-workspace path.
+  resolveReviewRich: (
+    id: string,
+    body: { choice: string; note?: string; pinnedValue?: string },
+  ) => send<{ id: string; choice: string }>('POST', `/review-queue/${id}/resolve`, body),
 
   runAll: () => send<RunResponse>('POST', '/run'),
   runOne: (ticker: string) => send<RunResponse>('POST', `/companies/${ticker}/run`),

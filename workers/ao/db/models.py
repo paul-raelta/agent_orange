@@ -375,6 +375,21 @@ class Setting(Base):
     )
 
 
+class FeatureFlag(Base):
+    """Per-user LABS feature flags. Each row is a single user; the three
+    columns gate the optional earnings features (Consensus, Conflict,
+    Guidance). When a flag is False the backend skips its work entirely —
+    no estimate fetches, no guidance extraction, no conflict workspace
+    payload — and the frontend hides the corresponding surface."""
+
+    __tablename__ = "feature_flags"
+
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    consensus: Mapped[bool] = mapped_column(Boolean, default=True)
+    conflict: Mapped[bool] = mapped_column(Boolean, default=True)
+    guidance: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 # --- financial data sources (agent fetchers) --------------------------------
 class DataSource(Base):
     """A financial-data feed the agents fetch from. Built-ins (sec_edgar,

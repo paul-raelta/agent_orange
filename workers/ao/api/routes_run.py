@@ -120,19 +120,45 @@ async def trigger_run_one(
 
 @router.post("/companies", response_model=s.RunResponse)
 async def add_company(body: s.AddCompanyRequest):
-    """Kicks off discovery. The real agent pipeline replaces this stub."""
+    """Kicks off discovery. The real agent pipeline replaces this stub.
+
+    A small allowlist of tickers returns competing IR `candidates[]` so the
+    UI's "⚑ CONFIRM IR" step is exercisable end-to-end against the stub.
+    The user's pick rides back via POST /companies/batch primaryIr.
+    """
     job_id = uuid4().hex
     ticker = body.ticker.upper()
+    ir = (
+        "ir.amd.com" if ticker == "AMD"
+        else f"investors.{ticker.lower()}.com"
+    )
+    # Demo set: tickers where the public IR page is split between a corporate
+    # and a long-form quarterly-results page. The user picks one as primary.
+    AMBIGUOUS = {
+        "AMD": [
+            ("https://ir.amd.com", "Corporate investor relations homepage"),
+            ("https://ir.amd.com/quarterly-results", "Quarterly results & filings"),
+        ],
+        "GOOGL": [
+            ("https://abc.xyz/investor", "Alphabet investor relations"),
+            ("https://abc.xyz/investor/news/", "Press releases & earnings"),
+        ],
+        "META": [
+            ("https://investor.fb.com", "Meta investor homepage"),
+            ("https://investor.fb.com/financials/", "Financials & filings"),
+        ],
+    }
+    candidates: list[s.IRCandidate] | None = None
+    if ticker in AMBIGUOUS:
+        candidates = [s.IRCandidate(url=u, note=n) for (u, n) in AMBIGUOUS[ticker]]
     _discovery_jobs[job_id] = {
         "phase": "found",
         "result": s.DiscoveryResultPayload(
-            ir=(
-                "ir.amd.com" if ticker == "AMD"
-                else f"investors.{ticker.lower()}.com"
-            ),
+            ir=ir,
             sec=f"EDGAR · search “{ticker}”",
             cadence="Quarterly (inferred from last 8 filings)",
             window="predicted ±10 days around prior dates",
+            candidates=candidates,
         ).model_dump(),
     }
     return s.RunResponse(jobId=job_id, lastSync=_now())

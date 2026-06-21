@@ -31,7 +31,11 @@ async def resolve_review(
     row = await db.get(m.ReviewItem, review_id)
     if row is None or row.user_id != user_id:
         raise HTTPException(404, f"Unknown review item '{review_id}'")
-    row.resolved_choice = body.choice
+    # For the Conflict workspace path, pinnedValue carries the chosen figure
+    # (e.g. "$0.96") so it can be persisted alongside the abstract choice
+    # ('A'|'B'|'flag'|'both-wrong'). The simple resolve path passes neither
+    # and only the choice column is updated.
+    row.resolved_choice = body.pinnedValue or body.choice
     row.resolved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     await db.commit()
     return {"id": review_id, "choice": body.choice}

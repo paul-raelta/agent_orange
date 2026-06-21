@@ -18,6 +18,8 @@ export type Metric = {
   yoy: number | null
   conf: Conf
   prov: Provenance[]
+  /* Optional — only attached when flags.consensus is on (see hooks.ts). */
+  consensus?: MetricConsensus
 }
 
 export type Validation = {
@@ -92,6 +94,63 @@ export type NotificationPrefs = {
   onBudget80: boolean
 }
 
+/* LABS feature flags. Each toggle gates ONE optional earnings feature; the
+   render contract is `flags.x && <Thing/>`. With every flag off the app is
+   indistinguishable from pre-feature main. */
+export type FeatureFlags = {
+  consensus: boolean
+  conflict: boolean
+  guidance: boolean
+}
+export const DEFAULT_FLAGS: FeatureFlags = {
+  consensus: true,
+  conflict: true,
+  guidance: true,
+}
+
+/* Consensus / Surprise — Feature 1 (flags.consensus). Optional Metric field. */
+export type MetricConsensus = {
+  estimate: number
+  estimateLabel: string
+  surprisePct: number
+  sourceCount: number
+}
+
+/* Conflict workspace — Feature 2 (flags.conflict). Optional ReviewItem field. */
+export type ConflictSourceId = 'A' | 'B'
+export type ConflictSource = {
+  id: ConflictSourceId
+  kind: 'SEC' | 'IR'
+  label: string
+  url: string
+  value: string
+  snippet: string
+  confidence: Conf
+  note: string
+}
+export type ReviewConflict = {
+  metric: string
+  period: string
+  sources: ConflictSource[]
+}
+
+/* Guidance — Feature 3 (flags.guidance). Optional Company field + endpoint. */
+export type GuidanceDirection = 'raised' | 'cut' | 'maintained'
+export type GuidanceProvenance = {
+  url: string
+  page: string
+  snippet: string
+}
+export type GuidanceItem = {
+  metric: string
+  period: string
+  low: string
+  high: string
+  prior?: string
+  direction: GuidanceDirection
+  provenance: GuidanceProvenance
+}
+
 export type Company = {
   ticker: string
   name: string
@@ -127,6 +186,8 @@ export type Company = {
   archivedAt?: string | null
   /* Optional investor-relations URL — used by ir_fetcher when set. */
   irUrl?: string | null
+  /* Forward guidance — only present when flags.guidance is on. */
+  guidance?: GuidanceItem[] | null
 }
 
 export type ReviewItem = {
@@ -140,6 +201,9 @@ export type ReviewItem = {
   field: string
   candidates: { value: string; source: string; page: number; weight: string }[]
   snippet: Provenance
+  /* Rich source diff — only attached when flags.conflict is on AND this item
+     has competing sources worth surfacing in the workspace UI. */
+  conflict?: ReviewConflict
 }
 
 export type ActivityRow = {
@@ -257,6 +321,23 @@ export type DiscoveryResult = {
   sec: string
   cadence: string
   window: string
+  /* Optional competing IR pages — when present (length > 1) the UI surfaces
+     a "CONFIRM IR" step so the user pins one as primary. */
+  candidates?: { url: string; note: string }[]
+}
+
+/* One row in the Add Companies browse grid / table. Served by GET /universe;
+   `data/sp500.ts` provides a bundled fallback used until the backend is up. */
+export type UniverseCompany = {
+  ticker: string
+  name: string
+  sector: string
+  price: number
+  dayChange: number
+  mcap: number          // market cap, $B
+  earn: string          // next-earnings display label, e.g. "Aug 06"
+  earnDays: number      // days-from-now until next earnings (sort key)
+  tracked: boolean      // already on this user's watchlist
 }
 
 export type DiscoveryStatus = {

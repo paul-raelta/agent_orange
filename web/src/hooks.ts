@@ -1,20 +1,25 @@
 /* Agent Orange — React Query hooks. This is the data layer the components read
    from. Server state lives in the query cache; nothing else global is needed. */
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
 import type {
   AddDataSourceRequest,
   CreateSourceSuggestionRequest,
+  FeatureFlags,
   NotificationPrefs,
   PatchDataSourceRequest,
   RoutingRule,
 } from './types'
+import { DEFAULT_FLAGS } from './types'
 
 export const keys = {
   companies: ['companies'] as const,
   archivedCompanies: ['companies', 'archived'] as const,
+  universe: ['universe'] as const,
   company: (ticker: string) => ['companies', ticker] as const,
   companySources: (ticker: string) => ['companies', ticker, 'sources'] as const,
+  guidance: (ticker: string) => ['companies', ticker, 'guidance'] as const,
   reviewQueue: ['review-queue'] as const,
   activity: (ticker?: string) => ['activity', ticker ?? 'all'] as const,
   usage: ['usage'] as const,
@@ -24,9 +29,84 @@ export const keys = {
   news: (ticker: string) => ['news', ticker] as const,
   insider: (ticker: string) => ['insider', ticker] as const,
   notificationPrefs: ['settings', 'notifications'] as const,
+  featureFlags: ['settings', 'flags'] as const,
   dataSources: ['data-sources'] as const,
   sourceSuggestions: ['source-suggestions'] as const,
 }
+
+/* --- LABS feature flags --------------------------------------------------- */
+
+const FLAGS_LS_KEY = 'ao-feature-flags'
+
+function readFlagsCache(): FeatureFlags {
+  try {
+    const raw = localStorage.getItem(FLAGS_LS_KEY)
+    if (!raw) return DEFAULT_FLAGS
+    const parsed = JSON.parse(raw)
+    return { ...DEFAULT_FLAGS, ...parsed }
+  } catch {
+    return DEFAULT_FLAGS
+  }
+}
+
+function writeFlagsCache(flags: FeatureFlags) {
+  try {
+    localStorage.setItem(FLAGS_LS_KEY, JSON.stringify(flags))
+  } catch {
+    /* localStorage might be unavailable (private mode); flags still work
+       per-session, they just don't survive reload. */
+  }
+}
+
+/* Synchronous, cache-first read of the feature flags. The localStorage cache
+   is consulted on first paint so gating never flashes; the React-Query mutation
+   below writes through to the backend AND refreshes the cache. */
+export function useFeatureFlags() {
+  const qc = useQueryClient()
+  const initial = readFlagsCache()
+  const query = useQuery({
+    queryKey: keys.featureFlags,
+    queryFn: api.getFeatureFlags,
+    initialData: initial,
+    staleTime: 30_000,
+  })
+  const [localFlags, setLocalFlags] = useState<FeatureFlags>(initial)
+  useEffect(() => {
+    if (query.data) {
+      writeFlagsCache(query.data)
+      setLocalFlags(query.data)
+    }
+  }, [query.data])
+
+  const mutation = useMutation({
+    mutationFn: (next: FeatureFlags) => api.putFeatureFlags(next),
+    onMutate: async (next) => {
+      // Optimistic: write through immediately so the UI re-gates without lag.
+      writeFlagsCache(next)
+      setLocalFlags(next)
+      qc.setQueryData(keys.featureFlags, next)
+    },
+    onSuccess: (saved) => {
+      writeFlagsCache(saved)
+      setLocalFlags(saved)
+      qc.setQueryData(keys.featureFlags, saved)
+    },
+  })
+
+  return {
+    flags: query.data ?? localFlags,
+    setFlag: (key: keyof FeatureFlags, value: boolean) =>
+      mutation.mutate({ ...(query.data ?? localFlags), [key]: value }),
+    saving: mutation.isPending,
+  }
+}
+
+export const useGuidance = (ticker: string, enabled: boolean) =>
+  useQuery({
+    queryKey: keys.guidance(ticker),
+    queryFn: () => api.getGuidance(ticker),
+    enabled,
+  })
 
 export const useCompanies = () =>
   useQuery({ queryKey: keys.companies, queryFn: api.getCompanies })
@@ -139,8 +219,18 @@ export const useNotificationPrefs = () =>
 export const useResolveReview = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, choice }: { id: string; choice: string }) =>
-      api.resolveReview(id, choice),
+    mutationFn: (
+      args: { id: string; choice: string; note?: string; pinnedValue?: string },
+    ) => {
+      if (args.note !== undefined || args.pinnedValue !== undefined) {
+        return api.resolveReviewRich(args.id, {
+          choice: args.choice,
+          note: args.note,
+          pinnedValue: args.pinnedValue,
+        })
+      }
+      return api.resolveReview(args.id, args.choice)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.reviewQueue })
     },
@@ -187,7 +277,23 @@ export const useRunAll = () => {
   })
 }
 
-export const useDiscover = () => useMutation({ mutationFn: api.discover })
+export const useDiscover = () =>
+  useMutation({ mutationFn: (ticker: string) => api.discover(ticker) })
+
+export const useUniverse = () =>
+  useQuery({ queryKey: keys.universe, queryFn: api.getUniverse, staleTime: 5 * 60_000 })
+
+export const useAddCompanies = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.addCompanies,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.companies })
+      qc.invalidateQueries({ queryKey: keys.portfolioTotals })
+      qc.invalidateQueries({ queryKey: keys.universe })
+    },
+  })
+}
 
 /* --- Data sources (financial-data feeds) --------------------------------- */
 

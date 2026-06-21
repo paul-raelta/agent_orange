@@ -135,7 +135,8 @@
 
   let host, timers = [], rafId = null, hasRun = false;
   // per-run state (reset in start)
-  let playlist = [];
+  let playlist = [];           // tickers WITH bespoke fixtures — play full chapters
+  let backgroundList = [];     // tickers without fixtures — render in the BG rail
   let cumulative = { pages: 0, tables: 0, figures: 0, sources: 0, cost: 0 };
   let results = [];
   const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
@@ -157,6 +158,10 @@
           <div class="rc-counter cost"><span class="rc-counter-val" data-c="cost">$0.00</span><span class="rc-counter-lab">opus spend</span></div>
           <div class="rc-elapsed" data-elapsed>0.0s</div>
         </div>
+      </div>
+      <div class="rc-bg-rail" data-bg-rail style="display:none">
+        <div class="rc-bg-lab">BACKGROUND TASKS</div>
+        <div class="rc-bg-pills" data-bg-pills></div>
       </div>
       <div class="rc-body">
         <div class="rc-col rc-left">
@@ -404,10 +409,51 @@
     await wait(900);
   }
 
+  // Static background rail — one pill per non-fixture ticker. Pills start in
+  // "refreshing" state and flip to "done" on a fixed timer evenly distributed
+  // across the chapter timeline so the rail finishes just before the summary
+  // card appears. The actual Finnhub jobs run in the backend regardless; this
+  // is presentation timing, not real progress.
+  function hydrateBackgroundRail() {
+    const rail = $("[data-bg-rail]");
+    const pills = $("[data-bg-pills]");
+    if (!rail || !pills) return;
+    if (!backgroundList.length) { rail.style.display = "none"; return; }
+    rail.style.display = "";
+    pills.innerHTML = backgroundList.map((t) => `
+      <div class="rc-bg-pill refreshing" data-bgticker="${t}">
+        <span class="rc-bg-spin"></span>
+        <span class="rc-bg-tk">${t}</span>
+        <span class="rc-bg-kinds">quote · news · insider</span>
+        <span class="rc-bg-stat">refreshing…</span>
+      </div>
+    `).join("");
+  }
+  function startBackgroundRail(totalMs) {
+    if (!backgroundList.length) return;
+    const headroom = 1500;                              // finish before summary
+    const startDelay = 1200;
+    const span = Math.max(0, totalMs - startDelay - headroom);
+    const stride = backgroundList.length > 1
+      ? span / (backgroundList.length - 1) : 0;
+    backgroundList.forEach((t, i) => {
+      later(startDelay + i * stride, () => {
+        const node = host && host.querySelector(`[data-bgticker="${t}"]`);
+        if (!node) return;
+        node.classList.remove("refreshing");
+        node.classList.add("done");
+        const stat = node.querySelector(".rc-bg-stat");
+        if (stat) stat.textContent = "✓ refreshed";
+      });
+    });
+  }
+
   async function run() {
     if (!playlist.length) playlist = [Object.keys(window.EXAMINER_COMPANIES || {})[0] || "NVDA"];
     const TOTAL = playlist.length * 9500 + 2500;
+    hydrateBackgroundRail();
     startElapsed(TOTAL);
+    startBackgroundRail(TOTAL);
     for (let i = 0; i < playlist.length; i++) {
       await runOne(i, playlist[i]);
     }
@@ -418,6 +464,9 @@
       line += ` · <b>${validated.length}</b> validated, <b>${reviewed.length}</b> routed to REVIEW (${reviewed.map((r) => r.ticker).join(", ")})`;
     } else {
       line += ` · all <b>${validated.length}</b> tickers <b>VALIDATED</b>`;
+    }
+    if (backgroundList.length) {
+      line += ` · refreshed quotes + news + insider for <b>${backgroundList.length}</b> more (${backgroundList.join(", ")})`;
     }
     const sumEl = $("[data-summary]"); if (sumEl) sumEl.innerHTML = line;
     const sumCard = host && host.querySelector(".rc-summary"); if (sumCard) sumCard.classList.add("show");
@@ -455,17 +504,22 @@
     host = null;
   }
 
-  // start() accepts a single ticker, an array of tickers, or undefined. When
-  // an array is given the engine plays each in sequence as its own chapter
-  // (counters accumulate, sources/extract reset between chapters). Tickers
-  // missing from window.EXAMINER_COMPANIES are silently dropped; if the
-  // playlist ends up empty, the first registry key plays as a fallback.
+  // start() accepts a single ticker, an array of tickers, or undefined. The
+  // engine splits the input into two lists:
+  //   - playlist: tickers WITH bespoke fixtures in EXAMINER_COMPANIES — each
+  //     plays as its own examined-doc chapter (~9.5s).
+  //   - backgroundList: tickers without fixtures — rendered in the
+  //     BACKGROUND TASKS rail with a static refreshing → done animation.
+  // The real Finnhub jobs hit those tickers in the backend regardless; the
+  // rail is presentation only.
   function start(tickersArg) {
     if (hasRun) { if (typeof window.onAgentRunComplete === "function") window.onAgentRunComplete(); return; }
     hasRun = true;
     const reg = window.EXAMINER_COMPANIES || {};
     const list = Array.isArray(tickersArg) ? tickersArg : (tickersArg ? [tickersArg] : Object.keys(reg));
-    playlist = list.filter((t) => t && reg[t]);
+    const dedup = Array.from(new Set(list.filter(Boolean)));
+    playlist = dedup.filter((t) => reg[t]);
+    backgroundList = dedup.filter((t) => !reg[t]);
     if (!playlist.length) playlist = Object.keys(reg).slice(0, 1);
     cumulative = { pages: 0, tables: 0, figures: 0, sources: 0, cost: 0 };
     results = [];

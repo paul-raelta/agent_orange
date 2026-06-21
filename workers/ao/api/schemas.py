@@ -39,6 +39,15 @@ class Provenance(WireBase):
     quote: str
 
 
+class MetricConsensus(WireBase):
+    """Optional Street-estimate context attached to a Metric when
+    flags.consensus is on. `surprisePct` = (actual − estimate) / |estimate| * 100."""
+    estimate: float
+    estimateLabel: str
+    surprisePct: float
+    sourceCount: int
+
+
 class Metric(WireBase):
     key: str
     value: str
@@ -46,6 +55,9 @@ class Metric(WireBase):
     yoy: float | None = None
     conf: Conf
     prov: list[Provenance] = Field(default_factory=list)
+    # Only populated when flags.consensus is on. Frontend renders surprise
+    # chips + the CONS/SURP columns conditionally on this field.
+    consensus: MetricConsensus | None = None
 
 
 class Validation(WireBase):
@@ -138,9 +150,39 @@ class NotificationPrefs(WireBase):
     onBudget80: bool
 
 
+class FeatureFlags(WireBase):
+    """LABS feature flags. Each toggle gates one optional earnings feature.
+    When off, the backend short-circuits the related work (no estimate
+    fetches, no guidance extraction, no workspace payload) and the UI
+    hides the corresponding surface — render contract is `flags.x && <Thing/>`.
+    """
+    consensus: bool = True
+    conflict: bool = True
+    guidance: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Top-level entity payloads
 # ---------------------------------------------------------------------------
+
+
+class GuidanceProvenance(WireBase):
+    url: str
+    page: str
+    snippet: str
+
+
+GuidanceDirection = Literal["raised", "cut", "maintained"]
+
+
+class GuidanceItem(WireBase):
+    metric: str
+    period: str
+    low: str
+    high: str
+    prior: str | None = None
+    direction: GuidanceDirection
+    provenance: GuidanceProvenance
 
 
 class Company(WireBase):
@@ -172,6 +214,9 @@ class Company(WireBase):
     # Optional investor-relations URL. When set, ir_fetcher uses it during the
     # discover step instead of (or in addition to) the user-global IR source.
     irUrl: str | None = None
+    # Forward guidance — only populated when flags.guidance is on; the dedicated
+    # GET /companies/{ticker}/guidance endpoint is the canonical fetch.
+    guidance: list[GuidanceItem] | None = None
 
 
 class ReviewCandidate(WireBase):
@@ -179,6 +224,26 @@ class ReviewCandidate(WireBase):
     source: str
     page: int
     weight: str
+
+
+ConflictSourceId = Literal["A", "B"]
+
+
+class ConflictSource(WireBase):
+    id: ConflictSourceId
+    kind: SourceKind
+    label: str
+    url: str
+    value: str
+    snippet: str
+    confidence: Conf
+    note: str
+
+
+class ReviewConflict(WireBase):
+    metric: str
+    period: str
+    sources: list[ConflictSource]
 
 
 class ReviewItem(WireBase):
@@ -192,6 +257,9 @@ class ReviewItem(WireBase):
     field: str
     candidates: list[ReviewCandidate]
     snippet: Provenance
+    # Only attached when flags.conflict is on AND this review row has at least
+    # two competing sources worth showing in the side-by-side workspace.
+    conflict: ReviewConflict | None = None
 
 
 class ActivityRow(WireBase):
@@ -338,6 +406,10 @@ class PositionRequest(WireBase):
 
 class ResolveReviewRequest(WireBase):
     choice: str
+    # Optional fields used by the Conflict workspace (flags.conflict). The
+    # simple Review path still POSTs just { choice }, which validates fine.
+    note: str | None = None
+    pinnedValue: str | None = None
 
 
 class AddCompanyRequest(WireBase):
@@ -353,14 +425,47 @@ class RunResponse(WireBase):
     lastSync: str
 
 
+class IRCandidate(WireBase):
+    url: str
+    note: str
+
+
 class DiscoveryResultPayload(WireBase):
     ir: str
     sec: str
     cadence: str
     window: str
+    # Optional competing IR pages — populated when discovery finds more than
+    # one plausible IR site. The UI surfaces a "CONFIRM IR" step and the user's
+    # pick rides back to the server via POST /companies/batch primaryIr.
+    candidates: list[IRCandidate] | None = None
 
 
 class DiscoveryStatus(WireBase):
     phase: Literal["discovering", "found", "error"]
     result: DiscoveryResultPayload | None = None
     error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Add Companies (browse the S&P 500 + batch-commit selection)
+# ---------------------------------------------------------------------------
+
+
+class UniverseCompany(WireBase):
+    """One row in the Add Companies browse grid. v1 serves from the static
+    S&P 500 seed roster + Price snapshot for tracked tickers."""
+    ticker: str
+    name: str
+    sector: str
+    price: float
+    dayChange: float
+    mcap: float          # $B
+    earn: str            # next-earnings display label, e.g. "Aug 06"
+    earnDays: int
+    tracked: bool
+
+
+class BatchAddRequest(WireBase):
+    tickers: list[str]
+    primaryIr: dict[str, str] = Field(default_factory=dict)

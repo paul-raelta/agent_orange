@@ -8,6 +8,7 @@ import App from './App'
 import { ThemeProvider } from './theme/ThemeProvider'
 import './styles/tokens.css'
 import './styles/app.css'
+import './styles/motion.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

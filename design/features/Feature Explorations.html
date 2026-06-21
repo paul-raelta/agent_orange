@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<style data-omelette-injected>html,body{background:transparent}</style><script data-omelette-injected>(()=>{var j=["https://claude.ai","https://preview.claude.ai"];var x=true;var S=30000;var f=3000;document.addEventListener("DOMContentLoaded",()=>{const H=window.Babel;const G="om-src-id";if(H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[G])){H.registerPlugin(G,({types:Y})=>({visitor:{JSXOpeningElement(U,Q){const J=U.node;if(J.name&&J.name.type==="JSXMemberExpression")return;for(let V=0;V<J.attributes.length;V++){const L=J.attributes[V];if(L.type==="JSXAttribute"&&L.name&&L.name.name==="data-om-id")return}const W=Q.file&&Q.file.opts&&Q.file.opts.filename||"?";const Z=J.loc&&J.loc.start;const z=`jsx:${W}:${J.start??0}:${Z?Z.line:0}:${Z?Z.column+1:0}`;J.attributes.push(Y.jsxAttribute(Y.jsxIdentifier("data-om-id"),Y.stringLiteral(z)))}}}))}const k="om-text-extract";let A=false;if(x&&H&&H.registerPlugin&&!(H.availablePlugins&&H.availablePlugins[k])){const Y=window.React;if(Y&&Y.useSyncExternalStore&&Y.createElement){A=true;const U={};const Q=new Set;let J=0;window.__omTextO=U;window.__omTextSet=(z)=>{for(const V in z){const L=z[V];if(L==null)delete U[V];else U[V]=L}J++;Q.forEach((V)=>V())};const W=(z)=>{Q.add(z);return()=>Q.delete(z)};const Z=()=>J;window.__OmT=function z(V){Y.useSyncExternalStore(W,Z,Z);return Y.createElement("span",{"data-om-text":V.i,className:"__om-t"},V.i in U?U[V.i]:V.children)};H.registerPlugin(k,({types:z})=>{const V={style:1,script:1,noscript:1,textarea:1,title:1,option:1,text:1,tspan:1,textPath:1};const L={placeholder:1,alt:1,title:1,label:1,"aria-label":1,"aria-description":1,"aria-placeholder":1};const _=($,C)=>z.logicalExpression("??",z.memberExpression(z.logicalExpression("||",z.memberExpression(z.identifier("window"),z.identifier("__omTextO")),z.objectExpression([])),z.stringLiteral($),true),C);const E=($)=>$.file&&$.file.opts&&$.file.opts.filename||"?";const B=($)=>$.file&&$.file.code||"";const b=($,C)=>{const X=(F)=>F&&F.start!=null&&F.end!=null&&(F.type==="StringLiteral"||F.type==="TemplateLiteral"&&F.expressions.length===0)?[F.start,F.end]:null;const N=X(C);if(N)return N;if(C&&C.type==="Identifier"){const F=$.scope.getBinding(C.name);if(F&&F.constant&&F.path.node.type==="VariableDeclarator"){return X(F.path.node.init)}}return null};const M=($,C,X)=>{const N=$.node;let F=false;const w=(K,q)=>{F=true;return z.jsxElement(z.jsxOpeningElement(z.jsxIdentifier("__OmT"),[z.jsxAttribute(z.jsxIdentifier("i"),z.stringLiteral(K))],false),z.jsxClosingElement(z.jsxIdentifier("__OmT")),[q],false)};const D=N.children.map((K)=>{if(K.type==="JSXText"){if(K.start==null||K.end==null)return K;const q=X.slice(K.start,K.end);const R=q.length-q.trimStart().length;const m=q.length-q.trimEnd().length;if(R+m>=q.length)return K;return w(`txt:${C}:${K.start+R}:${K.end-m}`,K)}if(K.type==="JSXExpressionContainer"){const q=b($,K.expression);if(q)return w(`str:${C}:${q[0]}:${q[1]}`,K)}return K});if(F)N.children=D};return{visitor:{JSXOpeningElement($,C){const X=$.node;const N=E(C);const F={};for(let w=0;w<X.attributes.length;w++){const D=X.attributes[w];if(D.type!=="JSXAttribute"||!D.name)continue;const K=D.name.name;if(!L[K])continue;if(!D.value||D.value.type!=="StringLiteral")continue;if(D.value.start==null||D.value.end==null)continue;const q=`txt:${N}:${D.value.start}:${D.value.end}`;F[K]=q;D.value=z.jsxExpressionContainer(_(q,z.stringLiteral(D.value.value)))}if(Object.keys(F).length){X.attributes.push(z.jsxAttribute(z.jsxIdentifier("data-om-text-attrs"),z.stringLiteral(JSON.stringify(F))))}},JSXElement($,C){const X=$.node.openingElement;const N=X&&X.name&&X.name.name;if(N==="__OmT")return;if(typeof N==="string"&&V[N])return;M($,E(C),B(C))},JSXFragment($,C){M($,E(C),B(C))}}}})}}const u=A?["transform-react-jsx-source",G,k]:["transform-react-jsx-source",G];document.querySelectorAll('script[type="text/babel"],script[type="text/jsx"]').forEach((Y,U)=>{const Q=Y.getAttribute("data-plugins")||"";const J=u.filter((W)=>Q.indexOf(W)<0);if(J.length){Y.setAttribute("data-plugins",Q?`${Q},${J.join(",")}`:J.join(","))}if(!Y.hasAttribute("data-filename")){Y.setAttribute("data-filename",Y.getAttribute("src")||`inline-${U}`)}})});var y=window.parent;if(y&&y!==window){const H=(Q,J)=>{try{y.postMessage({__omelette_log:true,type:Q,data:J},"*")}catch{}};["log","warn","error"].forEach((Q)=>{const J=console[Q];console[Q]=(...W)=>{const Z=W.map((z)=>{try{return typeof z==="object"?JSON.stringify(z):String(z)}catch{try{return String(z)}catch{return"[unstringifiable]"}}}).join(" ");H(Q,Z);J.apply(console,W)}});window.addEventListener("error",(Q)=>{const J=Q.target;if(J&&J!==window&&J.tagName){const W=J.src||J.href||"";H("resource_error",`${J.tagName} failed to load: ${W}`)}else{H("error",`${Q.message||"Unknown error"} at ${Q.filename||"?"}:${Q.lineno||0}:${Q.colno||0}`)}},true);window.addEventListener("unhandledrejection",(Q)=>{const J=Q.reason;const W=J instanceof Error?`${J.message} ${J.stack}`:String(J);H("error",`Unhandled rejection: ${W}`)});const G=()=>{try{y.postMessage({type:"omelette:height",height:document.documentElement.scrollHeight},"*")}catch{}};if(document.readyState==="complete")G();else window.addEventListener("load",G);if(window.ResizeObserver)new ResizeObserver(G).observe(document.documentElement);const k={};let A=0;window.claude={complete(Q){return new Promise((J,W)=>{if(!j.length){W(new Error("claude.complete: no parent origin"));return}const Z=`c${++A}`;const z=()=>setTimeout(()=>{delete k[Z];W(new Error(`claude.complete: no data for ${S/1000}s`))},S);const V=z();k[Z]={resolve:J,reject:W,text:"",t:V,arm:z};try{for(const L of j){y.postMessage({__om_api:true,id:Z,body:Q},L)}}catch(L){clearTimeout(V);delete k[Z];W(L)}})}};const u={};let Y=0;window.omelette={writeFile:(Q,J)=>new Promise((W,Z)=>{if(!j.length){W();return}const z=`f${++Y}`;const V=setTimeout(()=>{delete u[z];W()},f);u[z]={resolve:W,reject:Z,t:V};try{for(const L of j){y.postMessage({__om_file:true,id:z,op:"write",path:Q,content:J},L)}}catch{clearTimeout(V);delete u[z];W()}})};const U=(Q)=>{try{return JSON.stringify(Q)}catch{return JSON.stringify(String(Q))}};window.addEventListener("message",(Q)=>{if(j.indexOf(Q.origin)<0)return;if(Q.source!==y)return;const J=Q.data;if(!J)return;if(J.type==="omelette-preview-refresh"){if(typeof J.token!=="string"||!/^[0-9a-f.-]+(\.(rc|pr-[0-9]+))?(\.[0-9]+\.[0-9a-f]{16})?$/.test(J.token))return;const z=Math.max(1,Math.floor((J.expiresAt||0)-Date.now()/1000));document.cookie="__Host-omelette-preview="+J.token+"; Path=/; Secure; SameSite=None; Partitioned; Max-Age="+z;return}if(J.__om_file_r){const z=u[J.id];if(!z)return;clearTimeout(z.t);delete u[J.id];if(J.ok)z.resolve();else z.reject(new Error(J.error||"write failed"));return}if(J.__om_api_r){const z=k[J.id];if(!z)return;if(J.error!=null){clearTimeout(z.t);delete k[J.id];z.reject(new Error(J.error));return}if(J.chunk!=null){clearTimeout(z.t);z.t=z.arm();z.text+=J.chunk;return}if(J.done){clearTimeout(z.t);delete k[J.id];z.resolve(J.text!=null?J.text:z.text);return}return}if(!J.__om_eval)return;const W=J;const Z=(z)=>{Q.source.postMessage({...z,__om_eval_r:1,id:W.id},Q.origin)};try{const z=(0,eval)(W.code);if(z&&typeof z.then==="function"){z.then((V)=>Z({ok:1,v:U(V)}),(V)=>Z({ok:0,e:String(V)}))}else{Z({ok:1,v:U(z)})}}catch(z){Z({ok:0,e:String(z)})}})}})();
+</script>
+
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Orange — Feature Explorations (Round A)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#07090c; --panel:#0d1117; --panel-2:#11161d; --raised:#161d27;
+  --line:#222b37; --line-soft:#1a212b;
+  --text:#e4e8ee; --text-2:#929dac; --text-3:#5f6975;
+  --accent:#e8723a; --accent-soft:rgba(232,114,58,.13); --accent-line:rgba(232,114,58,.40);
+  --green:#4ec77a; --red:#ff6b5e; --amber:#e3a52e; --blue:#5aa2f0;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --r:7px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--mono);color:var(--text)}
+.delta-up{color:var(--green)}.delta-down{color:var(--red)}
+.lbl2{font-size:9px;letter-spacing:.13em;color:var(--text-3);text-transform:uppercase;font-weight:600}
+
+/* artboards render on a dark panel so the terminal UI reads true */
+.ab-skin{background:var(--bg);width:100%;height:100%;padding:22px;overflow:hidden}
+.mk-h2{font-size:10px;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;font-weight:600;margin:0 0 10px}
+
+/* glyph */
+.mk-glyph{width:34px;height:34px;flex:0 0 34px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--raised);color:var(--text);border:1px solid var(--line);position:relative;overflow:hidden}
+.mk-glyph::after{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--g)}
+.mk-glyph.sm{width:26px;height:26px;flex-basis:26px;font-size:9px}
+.mk-tkr{font-size:15px;font-weight:700}
+.mk-sub{font-size:9.5px;color:var(--text-2)}
+.mk-conf{font-size:8px;letter-spacing:.08em;font-weight:600;border:1px solid;border-radius:4px;padding:2px 5px}
+.mk-beat{font-size:9px;letter-spacing:.06em;font-weight:700;border:1px solid;border-radius:5px;padding:3px 8px;white-space:nowrap}
+
+/* 1 · consensus card */
+.mk-card{border:1px solid var(--line);border-left:3px solid var(--g);border-radius:var(--r);background:var(--panel-2);padding:14px;width:300px}
+.mk-c-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.mk-c-id{flex:1;min-width:0}
+.mk-c-price{display:flex;align-items:baseline;gap:9px;margin-bottom:13px}
+.mk-pv{font-size:16px;font-weight:600}
+.mk-chg{font-size:11px}
+.mk-cons{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.mk-cons-row{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:'k act surp' 'k est surp';column-gap:8px;align-items:center}
+.mk-cons-k{grid-area:k;font-size:8.5px;letter-spacing:.05em;color:var(--text-3);text-transform:uppercase;width:62px}
+.mk-cons-act{grid-area:act;font-size:13px;font-weight:600}
+.mk-cons-est{grid-area:est;font-size:9px;color:var(--text-3)}
+.mk-cons-surp{grid-area:surp;font-size:11px;font-weight:600;text-align:right}
+.mk-c-foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.mk-src{font-size:9px;color:var(--text-3);letter-spacing:.03em}
+
+/* 1 · banner + table */
+.mk-banner{display:flex;align-items:center;gap:11px;border:1px solid rgba(78,199,122,.3);background:rgba(78,199,122,.07);border-radius:var(--r);padding:11px 14px}
+.mk-banner-tx{font-size:11px;font-family:var(--sans);color:var(--text-2);line-height:1.4}
+.mk-banner-tx b{color:var(--text)}
+.mk-tbl{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.mk-tr{display:grid;grid-template-columns:1.4fr 1fr 1fr .8fr .6fr;gap:8px;padding:9px 13px;font-size:11px;border-bottom:1px solid var(--line-soft);align-items:center}
+.mk-tr:last-child{border-bottom:none}
+.mk-thead{background:var(--panel-2);font-size:8.5px;letter-spacing:.08em;color:var(--text-3);text-transform:uppercase;font-weight:600}
+.mk-tr .num{text-align:right}
+.mk-est{color:var(--text-3)}
+
+/* 2 · conflict workspace */
+.mk-cw{width:560px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden}
+.mk-cw-hd{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.mk-flag{margin-left:auto;font-size:9px;letter-spacing:.1em;font-weight:600;color:var(--amber);border:1px solid rgba(227,165,46,.4);background:rgba(227,165,46,.1);border-radius:5px;padding:4px 9px}
+.mk-diff{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.mk-col{background:var(--panel);padding:16px;transition:.15s}
+.mk-col.pick{background:linear-gradient(180deg,rgba(78,199,122,.08),var(--panel))}
+.mk-col-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.mk-srcpill{font-size:9.5px;color:var(--text-2);border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+.mk-srcpill b{color:var(--accent);font-size:8.5px}
+.mk-val{font-size:30px;font-weight:700;letter-spacing:.01em;margin-bottom:12px}
+.mk-snip{font-family:var(--sans);font-size:11.5px;color:var(--text-2);line-height:1.5;border-left:2px solid var(--accent-line);padding-left:10px;margin-bottom:10px}
+.mk-snip b{color:var(--text);background:var(--accent-soft);padding:0 3px;border-radius:3px}
+.mk-link{display:block;font-size:10px;color:var(--blue);margin-bottom:8px;cursor:pointer;word-break:break-all}
+.mk-note{font-size:9.5px;color:var(--text-3);margin-bottom:14px}
+.mk-pick{width:100%;font-size:10.5px;letter-spacing:.06em;font-weight:600;padding:9px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-2);cursor:pointer;transition:.15s}
+.mk-pick:hover{border-color:var(--text-3);color:var(--text)}
+.mk-pick.on{background:var(--green);border-color:var(--green);color:#08130b}
+.mk-vs{position:absolute;left:50%;top:64px;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;background:var(--raised);border:1px solid var(--line);display:grid;place-items:center;font-size:9px;font-weight:700;color:var(--text-3);z-index:2}
+.mk-rail{padding:14px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px;background:var(--panel-2)}
+.mk-rail-actions{display:flex;gap:8px}
+.mk-act{font-size:10.5px;letter-spacing:.05em;font-weight:600;padding:9px 12px;border-radius:6px;cursor:pointer;border:1px solid var(--line);transition:.15s}
+.mk-act.ghost{background:transparent;color:var(--text-2)}
+.mk-act.ghost:hover{color:var(--text);border-color:var(--text-3)}
+.mk-act.prim{background:var(--accent);color:#08090b;border-color:var(--accent)}
+.mk-act.prim:disabled{opacity:.4;cursor:default}
+.mk-noteinput{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--sans);font-size:11px}
+.mk-noteinput:focus{outline:none;border-color:var(--accent)}
+.mk-history{padding:12px 16px;border-top:1px solid var(--line-soft)}
+.mk-hist-row{font-size:10px;color:var(--text-2);margin-top:6px;font-family:var(--sans)}
+.mk-hist-row b{color:var(--green);font-family:var(--mono)}
+
+/* 3 · guidance */
+.mk-tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:14px}
+.mk-tab{font-size:10px;letter-spacing:.1em;font-weight:600;padding:9px 14px;color:var(--text-3)}
+.mk-tab.on{color:var(--text);border-bottom:2px solid var(--accent)}
+.mk-g-intro{font-size:11px;font-family:var(--sans);color:var(--text-2);margin-bottom:16px;max-width:380px}
+.mk-g-row{border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);padding:13px 15px;margin-bottom:9px}
+.mk-g-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.mk-g-metric{font-size:13px;font-weight:600}
+.mk-g-period{font-size:9.5px;color:var(--text-3)}
+.mk-g-dir{margin-left:auto;font-size:8.5px;letter-spacing:.08em;font-weight:700;border:1px solid;border-radius:4px;padding:2px 7px}
+.mk-g-range{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+.mk-g-now{font-size:16px;font-weight:700}
+.mk-g-prior{font-size:10px;color:var(--text-3);text-decoration:line-through}
+.mk-g-bar{position:relative;height:6px;background:var(--raised);border-radius:3px;margin-bottom:10px;overflow:hidden}
+.mk-g-bar-prior{position:absolute;left:18%;width:34%;top:0;bottom:0;background:var(--line);border-radius:3px}
+.mk-g-bar-now{position:absolute;left:42%;width:40%;top:0;bottom:0;background:var(--accent-soft);border:1px solid;border-radius:3px}
+.mk-g-prov{font-size:9.5px;color:var(--text-3);font-family:var(--sans);font-style:italic}
+
+/* canvas note cards */
+.note-card{font-family:var(--sans)}
+.note-card h4{margin:0 0 6px;font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+.note-card p{margin:0;font-size:11.5px;line-height:1.5;color:#5b5345}
+.note-card .eff{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:#8a7d63;margin-top:8px;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8723a"/><rect x="30" y="30" width="40" height="40" rx="6" fill="#07090c"/></svg>
+</template>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="mocks.jsx"></script>
+<script type="text/babel">
+const { useState } = React
+function Note({ title, children, eff }) {
+  return <div className="note-card"><h4>{title}</h4><p>{children}</p>{eff && <div className="eff">{eff}</div>}</div>
+}
+function Canvas() {
+  return (
+    <DesignCanvas>
+      <DCSection id="s1" title="1 · Consensus vs Actual" subtitle="Make every screen answer 'should I care?' — surprise vs Street estimate">
+        <DCArtboard id="c1a" label="Watchlist card · surprise chips" width={344} height={300}>
+          <div className="ab-skin"><ConsensusCard /></div>
+        </DCArtboard>
+        <DCArtboard id="c1b" label="Deep-dive · beat/miss banner + vs-est column" width={520} height={300}>
+          <div className="ab-skin"><ConsensusTable /></div>
+        </DCArtboard>
+        <DCArtboard id="c1n" label="Notes" width={300} height={300}>
+          <div className="ab-skin" style={{background:'#f4efe4'}}>
+            <Note title="Consensus vs Actual" eff="Effort: S · Demo: high · do first">
+              Smallest surface, biggest signal. One new field on Metric (estimate + surprise%); no new endpoint. Unblocks the beat/miss language the other two reference. Estimates from a provider (Finnhub-style).
+            </Note>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="s2" title="2 · Conflict-Resolution Workspace" subtitle="The differentiator — where human-in-the-loop earns its keep">
+        <DCArtboard id="c2a" label="Side-by-side diff + decision rail" width={604} height={560}>
+          <div className="ab-skin"><ConflictWorkspace /></div>
+        </DCArtboard>
+        <DCArtboard id="c2n" label="Notes" width={300} height={560}>
+          <div className="ab-skin" style={{background:'#f4efe4'}}>
+            <Note title="Conflict workspace" eff="Effort: M · Demo: very high">
+              The screen that sells the whole thesis. Two source columns (value, highlighted snippet, page ref, confidence) + a decision rail (Accept A/B, Flag, Both-wrong) with a required note. Click a column to pick — try it. Resolution writes back via the existing resolve endpoint; emits review.resolved on the SSE stream you already have. The "similar past resolutions" strip feeds the future track-record idea.
+            </Note>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="s3" title="3 · Guidance Tab" subtitle="Forward outlook vs prior guidance — the on-thesis depth play">
+        <DCArtboard id="c3a" label="Deep-dive GUIDANCE tab" width={460} height={430}>
+          <div className="ab-skin"><GuidanceTab /></div>
+        </DCArtboard>
+        <DCArtboard id="c3n" label="Notes" width={300} height={430}>
+          <div className="ab-skin" style={{background:'#f4efe4'}}>
+            <Note title="Guidance extraction" eff="Effort: M–L (backend) · Demo: high">
+              Earnings move on guidance, often more than the printed quarter. Range per metric, vs prior (raised/cut/maintained), with provenance to the exact sentence. UI is easy once data exists — the lift is forward-looking extraction in workers/. Do last; benefits from the beat/miss framing.
+            </Note>
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  )
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Canvas />)
+</script>
+</body>
+</html>

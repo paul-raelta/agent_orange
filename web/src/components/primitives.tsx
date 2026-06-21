@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { Conf as ConfLevel, Provenance } from '../types'
 import { STATUS, type Status } from './status'
+import { usePriceFlash } from '../motion/motion'
 
 /* Status chip for an agent / company */
 export function StatusChip({ status, pulse }: { status: Status; pulse?: boolean }) {
@@ -86,7 +87,7 @@ export function Spark({
   const last = pts[pts.length - 1]
   return (
     <svg className="spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <path d={d} fill="none" stroke={color} strokeWidth="1.5" />
+      <path d={d} pathLength={1} fill="none" stroke={color} strokeWidth="1.5" />
       <circle cx={last[0]} cy={last[1]} r="2.2" fill={color} />
     </svg>
   )
@@ -148,9 +149,10 @@ export function Btn({
 
 export function Price({ price, change }: { price: number; change: number }) {
   const up = change >= 0
+  const flash = usePriceFlash(price)
   return (
     <span className="price">
-      <span className="price-val">{price.toFixed(2)}</span>
+      <span className={'price-val ' + flash}>{price.toFixed(2)}</span>
       <span className={'price-chg ' + (up ? 'delta-up' : 'delta-down')}>
         {up ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
       </span>
@@ -185,7 +187,7 @@ export function Drawer({
             ✕
           </button>
         </header>
-        <div className="drawer-bd">{children}</div>
+        <div className="drawer-bd drawer-stagger">{children}</div>
       </aside>
     </div>
   )

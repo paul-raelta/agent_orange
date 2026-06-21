@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Btn, Panel } from '../components/primitives'
 import { Loading } from '../components/Loading'
+import { CountUp } from '../motion/motion'
 import {
   useAddDataSource,
   useDataSources,
   useDeleteDataSource,
+  useFeatureFlags,
   useNotificationPrefs,
   usePatchDataSource,
   useProviders,
@@ -75,16 +77,18 @@ export function Settings() {
       <Panel title="USAGE — this month">
         <div className="usage">
           <div className="usage-big">
-            <span className="ub-val">${usage.monthCost.toFixed(2)}</span>
+            <span className="ub-val">
+              <CountUp value={usage.monthCost} prefix="$" decimals={2} />
+            </span>
             <span className="ub-lab">of ${usage.budget} budget</span>
           </div>
           <div className="usage-bar">
             <span style={{ width: pct + '%' }} />
           </div>
           <div className="usage-stats">
-            <span>{usage.monthTokens}M tokens</span>
-            <span>{usage.runs} runs</span>
-            <span>{pct}% of budget</span>
+            <span><CountUp value={usage.monthTokens} decimals={0} suffix="M tokens" /></span>
+            <span><CountUp value={usage.runs} decimals={0} suffix=" runs" /></span>
+            <span><CountUp value={pct} decimals={0} suffix="% of budget" /></span>
           </div>
         </div>
         <div className="usage-models">
@@ -123,6 +127,8 @@ export function Settings() {
           ))}
         </div>
       </Panel>
+
+      <FeatureFlagsPanel />
 
       <DataSourcesPanel />
 
@@ -276,7 +282,7 @@ export function Settings() {
 
       <Panel
         title="FIRST-TIME EXPERIENCE"
-        right={<span className="hint">destructive — wipes all fetched data</span>}
+        right={<span className="hint">destructive — wipes tracked companies + all fetched data</span>}
       >
         <p
           style={{
@@ -287,13 +293,14 @@ export function Settings() {
             marginBottom: 12,
           }}
         >
-          Clear every filing, result, metric, agent run, price snapshot, news
-          item, insider transaction and usage row — keeping your tracked
-          companies, positions, sources, model routing, and notification
-          settings. After wipe, click <b>RUN ALL AGENTS</b> on the Watchlist
-          to repopulate everything with live data: real EDGAR filings, real
-          Finnhub prices/news/insider, real Opus extraction + validation +
-          narrative, and real email + SMS notifications.
+          Clear every tracked company along with every filing, result,
+          metric, agent run, price snapshot, news item, insider transaction
+          and usage row — keeping your model routing, data-source registry,
+          and notification settings. After wipe, no companies are tracked;
+          add tickers from scratch, then click <b>RUN ALL AGENTS</b> on the
+          Watchlist to populate live data: real EDGAR filings, real Finnhub
+          prices/news/insider, real Opus extraction + validation + narrative,
+          and real email + SMS notifications.
         </p>
         {!confirmWipe ? (
           <Btn kind="danger" sm onClick={() => setConfirmWipe(true)}>
@@ -355,6 +362,81 @@ export function Settings() {
         </div>
       </Panel>
     </div>
+  )
+}
+
+/* ----------------------------------------------------------------------- */
+/* LABS · FEATURE FLAGS — one toggle per compartmentalized earnings feature. */
+/* Each row gates a single feature's surfaces; turning a row off must leave  */
+/* every other screen rendering exactly as it did before the feature shipped.*/
+/* ----------------------------------------------------------------------- */
+
+type FlagDef = {
+  key: 'consensus' | 'conflict' | 'guidance'
+  name: string
+  desc: string
+  surfaces: string
+}
+
+const FLAG_DEFS: FlagDef[] = [
+  {
+    key: 'consensus',
+    name: 'Consensus vs Actual',
+    desc: 'Surprise chips, beat/miss banner, and a "vs estimate" column.',
+    surfaces: 'Watchlist card · Deep-dive header + Results table',
+  },
+  {
+    key: 'conflict',
+    name: 'Conflict-Resolution Workspace',
+    desc: 'Side-by-side source diff with a decision rail for disputed figures.',
+    surfaces: 'Review queue item',
+  },
+  {
+    key: 'guidance',
+    name: 'Guidance Tracking',
+    desc: 'Forward outlook vs prior guidance, with provenance.',
+    surfaces: 'Deep-dive · GUIDANCE tab',
+  },
+]
+
+function FeatureFlagsPanel() {
+  const { flags, setFlag, saving } = useFeatureFlags()
+  return (
+    <Panel
+      title="LABS · FEATURE FLAGS"
+      right={
+        <span className="hint">
+          each flag is a render gate over optional data — turn it off and the
+          surface disappears, nothing else changes
+        </span>
+      }
+    >
+      <div className="ff-list">
+        {FLAG_DEFS.map((f) => (
+          <div className="ff-row" key={f.key}>
+            <div className="ff-info">
+              <div className="ff-name">{f.name}</div>
+              <div className="ff-desc">{f.desc}</div>
+              <div className="ff-surf">▸ {f.surfaces}</div>
+            </div>
+            <button
+              type="button"
+              className={'sw' + (flags[f.key] ? ' on' : '')}
+              onClick={() => setFlag(f.key, !flags[f.key])}
+              aria-label={`Toggle ${f.name}`}
+              aria-pressed={flags[f.key]}
+              disabled={saving}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="ff-note">
+        Each feature renders only when its flag is on, over optional data.
+        Off = the surface disappears; nothing else is touched. No restart, no
+        migration. Backend skips disabled features — no estimate fetches, no
+        guidance extraction, no workspace payload.
+      </p>
+    </Panel>
   )
 }
 

@@ -31,9 +31,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     log.info("api.startup", port=settings.api_port, db=settings.database_url)
     # Ensure the schema reflects current models — creates any new tables and
     # applies idempotent column adds to existing tables.
-    from ao.db.engine import ensure_schema
+    from ao.db.engine import ensure_schema, get_sessionmaker
+    from ao.db.seed import ensure_demo_anchor
 
     await ensure_schema()
+    # NVDA always exists for the default user — see ensure_demo_anchor docstring.
+    Session = get_sessionmaker()
+    async with Session() as session:
+        await ensure_demo_anchor(session)
     if settings.run_scheduler_in_process and settings.scheduler_mode == "inproc":
         log.info("scheduler.starting_in_api_process")
         # Avoided circular: imported here, not at module top.
@@ -74,6 +79,7 @@ def create_app() -> FastAPI:
         routes_run,
         routes_settings,
         routes_sources,
+        routes_universe,
         routes_usage,
     )
 
@@ -91,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_portfolio.router, prefix=prefix)
     app.include_router(routes_events.router, prefix=prefix)
     app.include_router(routes_admin.router, prefix=prefix)
+    app.include_router(routes_universe.router, prefix=prefix)
 
     return app
 

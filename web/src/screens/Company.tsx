@@ -1,8 +1,9 @@
 /* Agent Orange — Company deep-dive (company/:ticker, §5.2). Full history +
    validation + provenance for one company, plus AI narrative, portfolio editor,
    News + Insider tabs, and PLANNED tiles for future features. */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useTabInk } from '../motion/motion'
 import {
   Btn,
   Conf,
@@ -21,6 +22,8 @@ import {
   useArchiveCompany,
   useCompany,
   useCompanySources,
+  useFeatureFlags,
+  useGuidance,
   useInsider,
   useNews,
   usePatchCompany,
@@ -30,8 +33,10 @@ import {
 } from '../hooks'
 import type { HistoryRow, Metric } from '../types'
 
-const TABS = ['results', 'validation', 'news', 'insider', 'agent runs'] as const
-type Tab = (typeof TABS)[number]
+const BASE_TABS = ['results', 'validation', 'news', 'insider', 'agent runs'] as const
+type Tab =
+  | (typeof BASE_TABS)[number]
+  | 'guidance'
 
 const ROWS: [string, keyof HistoryRow][] = [
   ['Revenue', 'rev'],
@@ -67,9 +72,24 @@ export function Company() {
   const patchCompanySource = usePatchCompanySource(ticker)
   const resetCompanySource = useResetCompanySource(ticker)
   const patchCompany = usePatchCompany(ticker)
+  const { flags } = useFeatureFlags()
+  const guidanceQuery = useGuidance(ticker, flags.guidance)
+  const guidance = flags.guidance ? (c?.guidance ?? guidanceQuery.data ?? null) : null
+  const tabs: Tab[] = flags.guidance
+    ? ['results', 'validation', 'guidance', 'news', 'insider', 'agent runs']
+    : [...BASE_TABS]
   const [tab, setTab] = useState<Tab>('results')
+  useEffect(() => {
+    if (!tabs.includes(tab)) setTab('results')
+  }, [flags.guidance])  // eslint-disable-line react-hooks/exhaustive-deps
   const [prov, setProv] = useState<Metric | null>(null)
   const [irUrlInput, setIrUrlInput] = useState('')
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [activeTabBtn, setActiveTabBtn] = useState<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    setActiveTabBtn(tabRefs.current[tabs.indexOf(tab)] ?? null)
+  }, [tab, isLoading, c, flags.guidance])  // eslint-disable-line react-hooks/exhaustive-deps
+  const ink = useTabInk(activeTabBtn)
 
   function handleArchive() {
     if (!c) return
@@ -275,6 +295,8 @@ export function Company() {
         </div>
       </div>
 
+      {flags.consensus && <ConsensusBanner metrics={L.metrics} />}
+
       {c.status === 'review' && (
         <div className="banner banner-review">
           <span>⚑ This company has unresolved findings.</span>
@@ -285,15 +307,21 @@ export function Company() {
       )}
 
       <div className="tabs">
-        {TABS.map((t) => (
+        {tabs.map((t, i) => (
           <button
             key={t}
-            className={'tab' + (tab === t ? ' active' : '')}
+            ref={(el) => {
+              tabRefs.current[i] = el
+            }}
+            className={
+              'tab' + (tab === t ? ' active' : '') + (t === 'guidance' ? ' tab-new' : '')
+            }
             onClick={() => setTab(t)}
           >
             {t.toUpperCase()}
           </button>
         ))}
+        <span className="tab-ink" style={ink} />
       </div>
 
       {tab === 'results' && (
@@ -307,6 +335,8 @@ export function Company() {
                 <thead>
                   <tr>
                     <th className="sticky-col">METRIC</th>
+                    {flags.consensus && <th className="num cons-col">CONS</th>}
+                    {flags.consensus && <th className="num">SURP</th>}
                     {c.history.map((h) => (
                       <th key={h.period}>
                         <div className="th-period">{h.period}</div>
@@ -316,18 +346,41 @@ export function Company() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ROWS.map(([label, key]) => (
-                    <tr key={key}>
-                      <td className="sticky-col rowlab">{label}</td>
-                      {c.history.map((h, i) => (
-                        <td key={i} className={i === 0 ? 'cell-latest' : ''}>
-                          <span className="cell-val">{h[key]}</span>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  {ROWS.map(([label, key]) => {
+                    const lm = L.metrics.find((mm) => mm.key === label)
+                    const cs = flags.consensus ? lm?.consensus : undefined
+                    return (
+                      <tr key={key}>
+                        <td className="sticky-col rowlab">{label}</td>
+                        {flags.consensus && (
+                          <td className="num cons-col">{cs ? cs.estimateLabel : '—'}</td>
+                        )}
+                        {flags.consensus && (
+                          <td
+                            className={
+                              'num ' +
+                              (cs && cs.surprisePct > 0.3
+                                ? 'delta-up'
+                                : cs && cs.surprisePct < -0.3
+                                  ? 'delta-down'
+                                  : '')
+                            }
+                          >
+                            {cs ? (cs.surprisePct >= 0 ? '+' : '') + cs.surprisePct.toFixed(1) + '%' : '—'}
+                          </td>
+                        )}
+                        {c.history.map((h, i) => (
+                          <td key={i} className={i === 0 ? 'cell-latest' : ''}>
+                            <span className="cell-val">{h[key]}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
                   <tr>
                     <td className="sticky-col rowlab dim">confidence</td>
+                    {flags.consensus && <td className="num cons-col">—</td>}
+                    {flags.consensus && <td className="num">—</td>}
                     {c.history.map((h, i) => (
                       <td key={i} className={i === 0 ? 'cell-latest' : ''}>
                         <Conf
@@ -399,6 +452,64 @@ export function Company() {
               </div>
             ))}
           </div>
+        </Panel>
+      )}
+
+      {tab === 'guidance' && flags.guidance && (
+        <Panel title="FORWARD GUIDANCE">
+          <p className="gd-intro">
+            Forward outlook extracted from management commentary and earnings calls,
+            tracked vs. prior guidance. Every range links back to the exact sentence.
+          </p>
+          {!guidance || guidance.length === 0 ? (
+            <div className="gd-empty">
+              {guidanceQuery.isLoading
+                ? 'Loading guidance…'
+                : 'No forward guidance extracted yet. The extractor will populate this on the next earnings call.'}
+            </div>
+          ) : (
+            guidance.map((g) => {
+              const dirMap: Record<
+                'raised' | 'cut' | 'maintained',
+                { label: string; color: string }
+              > = {
+                raised: { label: 'RAISED ▲', color: 'var(--green)' },
+                cut: { label: 'CUT ▼', color: 'var(--red)' },
+                maintained: { label: 'MAINTAINED', color: 'var(--text-2)' },
+              }
+              const d = dirMap[g.direction]
+              return (
+                <div className="gd-row" key={g.metric + g.period}>
+                  <div className="gd-top">
+                    <span className="gd-metric">{g.metric}</span>
+                    <span className="gd-period">{g.period}</span>
+                    <span
+                      className="gd-dir"
+                      style={{ color: d.color, borderColor: d.color }}
+                    >
+                      {d.label}
+                    </span>
+                  </div>
+                  <div className="gd-range">
+                    <span className="gd-now">
+                      {g.low}–{g.high}
+                    </span>
+                    {g.prior && <span className="gd-prior">was {g.prior}</span>}
+                  </div>
+                  <div className="gd-prov">
+                    ▸ "{g.provenance.snippet}" ·{' '}
+                    {g.provenance.url ? (
+                      <a href={g.provenance.url} target="_blank" rel="noopener noreferrer">
+                        {g.provenance.page || 'source'} ↗
+                      </a>
+                    ) : (
+                      g.provenance.page || 'source'
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
         </Panel>
       )}
 
@@ -512,6 +623,35 @@ export function Company() {
           </>
         )}
       </Drawer>
+    </div>
+  )
+}
+
+function ConsensusBanner({ metrics }: { metrics: Metric[] }) {
+  const priced = metrics.filter((m) => m.consensus)
+  if (priced.length === 0) return null
+  const eps = priced.find((m) => m.key.toLowerCase().includes('eps')) ?? priced[0]
+  const epsSurprise = eps.consensus!.surprisePct
+  const above = priced.filter((m) => m.consensus!.surprisePct > 0).length
+  const kind = epsSurprise > 0.5 ? 'beat' : epsSurprise < -0.5 ? 'miss' : 'inline'
+  const label = kind === 'beat' ? 'BEAT' : kind === 'miss' ? 'MISS' : 'IN LINE'
+  return (
+    <div className={'co-cons-banner' + (kind === 'miss' ? ' miss' : '')}>
+      <span className={'beat-badge ' + kind}>
+        {label} {epsSurprise >= 0 ? '+' : ''}{epsSurprise.toFixed(1)}%
+      </span>
+      <span className="co-cons-banner-tx">
+        <b>
+          {eps.key} {eps.value}
+        </b>{' '}
+        vs {eps.consensus!.estimateLabel} consensus
+        {priced.length > 1 && (
+          <>
+            {' — '}
+            {above} of {priced.length} metric{priced.length === 1 ? '' : 's'} above estimate.
+          </>
+        )}
+      </span>
     </div>
   )
 }

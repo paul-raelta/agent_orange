@@ -1,0 +1,99 @@
+/* Agent Orange — motion system. Token-driven, reduced-motion-aware. Import once
+   in main.tsx AFTER app.css:  import './styles/motion.css'
+   Classes target the app's existing selectors (.wl-card, .ac-card, .spark, …)
+   plus a small set of helpers wired via motion.tsx (Reveal / CountUp / SkeletonCard).
+   See MOTION.md for the per-file wiring. */
+:root {
+  --mo-dur: 0.42s;
+  --mo-dur-slow: 0.9s;
+  --mo-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---- Entrance: wrap a group in <Reveal>; children fade+rise in, staggered ---- */
+.reveal > * {
+  transition: opacity var(--mo-dur) var(--mo-ease), transform var(--mo-dur) var(--mo-ease);
+}
+.reveal.is-entering > * { opacity: 0; transform: translateY(14px); }
+.reveal > *:nth-child(1)  { transition-delay: 0ms;   }
+.reveal > *:nth-child(2)  { transition-delay: 40ms;  }
+.reveal > *:nth-child(3)  { transition-delay: 80ms;  }
+.reveal > *:nth-child(4)  { transition-delay: 120ms; }
+.reveal > *:nth-child(5)  { transition-delay: 160ms; }
+.reveal > *:nth-child(6)  { transition-delay: 200ms; }
+.reveal > *:nth-child(7)  { transition-delay: 240ms; }
+.reveal > *:nth-child(8)  { transition-delay: 280ms; }
+.reveal > *:nth-child(9)  { transition-delay: 320ms; }
+.reveal > *:nth-child(10) { transition-delay: 360ms; }
+.reveal > *:nth-child(n+11) { transition-delay: 400ms; }
+
+/* single block (header strip, banner) */
+.reveal-item {
+  transition: opacity var(--mo-dur) var(--mo-ease), transform var(--mo-dur) var(--mo-ease);
+}
+.reveal-item.is-entering { opacity: 0; transform: translateY(14px); }
+
+/* ---- Sparkline trace (needs pathLength="1" on the <path>, see MOTION.md) ---- */
+.spark path { stroke-dasharray: 1; }
+.reveal .spark path { transition: stroke-dashoffset var(--mo-dur-slow) ease; }
+.reveal.is-entering .spark path { stroke-dashoffset: 1; }
+
+/* ---- Skeleton loaders (SkeletonCard from motion.tsx) ---- */
+.skel {
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--panel-2); padding: 14px; position: relative; overflow: hidden;
+}
+.skel .b { background: var(--raised); border-radius: 4px; }
+.skel::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.05) 50%, transparent 70%);
+  animation: mo-shimmer 1.4s infinite;
+}
+@keyframes mo-shimmer { to { transform: translateX(100%); } }
+/* crossfade the real grid in when it replaces the skeletons */
+.mo-fadein { animation: mo-fade var(--mo-dur) var(--mo-ease) both; }
+@keyframes mo-fade { from { opacity: 0; } }
+
+/* ---- Selection: snap the check (works with .ac-card.sel .ac-check) ---- */
+.ac-card.sel .ac-check { animation: mo-pop 0.18s cubic-bezier(0.34, 1.4, 0.5, 1); }
+@keyframes mo-pop { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
+/* sector "select all" ripple: add .rippling to the group + style={{'--i': index}} on cards */
+.ac-group.rippling .ac-card .ac-check { transition-delay: calc(var(--i, 0) * 30ms); }
+
+/* ---- Tray count roll: wrap the number in <span className="mo-roll" key={count}> ---- */
+.mo-roll { display: inline-block; animation: mo-roll 0.24s var(--mo-ease); }
+@keyframes mo-roll { from { transform: translateY(60%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ---- Price tick flash: toggle .tick-up / .tick-down for ~900ms (usePriceFlash) ---- */
+.tick-up   { animation: mo-flash-up   0.9s ease; }
+.tick-down { animation: mo-flash-down 0.9s ease; }
+@keyframes mo-flash-up   { 0% { background: rgba(78,199,122,0.40); border-radius: 4px; } 100% { background: transparent; } }
+@keyframes mo-flash-down { 0% { background: rgba(255,107,94,0.40); border-radius: 4px; } 100% { background: transparent; } }
+
+/* ---- Card hover glow (additive; base transforms already in app.css) ---- */
+.wl-card:hover, .ac-card:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 1px var(--accent-line), 0 12px 30px rgba(232,114,58,0.10);
+}
+
+/* ---- Tab underline slide: a .tab-ink element positioned over the active tab ---- */
+.tabs { position: relative; }
+.tab-ink {
+  position: absolute; bottom: -1px; height: 2px; background: var(--accent); left: 0;
+  transition: transform var(--mo-dur) var(--mo-ease), width var(--mo-dur) var(--mo-ease);
+}
+
+/* ---- Drawer content fade: wrap drawer body children in .drawer-stagger ---- */
+.drawer.open .drawer-stagger > * { animation: mo-rise var(--mo-dur) var(--mo-ease) both; }
+.drawer.open .drawer-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.drawer.open .drawer-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.drawer.open .drawer-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.drawer.open .drawer-stagger > *:nth-child(n+5) { animation-delay: 240ms; }
+@keyframes mo-rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* ---- Respect reduced motion: snap to final, no loops ---- */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; }
+  .reveal > *, .reveal-item, .spark path, .tab-ink { transition: none !important; }
+  .reveal.is-entering > *, .reveal-item.is-entering { opacity: 1; transform: none; }
+  .reveal.is-entering .spark path { stroke-dashoffset: 0; }
+}

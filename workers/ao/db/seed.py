@@ -11,7 +11,7 @@ import sys
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 
 def uuid_hex() -> str:
@@ -23,6 +23,41 @@ from ao.db.engine import create_all, get_engine, get_sessionmaker
 from ao.logging import get_logger, setup_logging
 
 log = get_logger(__name__)
+
+
+# NVDA is the demo anchor — the only ticker with real fixture content for the
+# Document Examiner overlay. We ensure it exists on every app start (and after
+# wipe) so the RUN ALL AGENTS hero chapter always has something to play, even
+# on a fresh DB where the user has only added their own tickers.
+async def ensure_demo_anchor(session) -> None:
+    settings = get_settings()
+    await session.merge(
+        m.User(id=settings.user_id, email=settings.user_email, phone=settings.user_phone)
+    )
+    existing = (await session.execute(
+        select(m.Company).where(
+            m.Company.user_id == settings.user_id, m.Company.ticker == "NVDA",
+        )
+    )).scalar_one_or_none()
+    if existing is not None:
+        return
+    company = m.Company(
+        id=uuid_hex(), user_id=settings.user_id, ticker="NVDA",
+        name="NVIDIA Corporation", sector="Semiconductors", currency="USD",
+        cadence="Quarterly", fiscal_note="FY ends late Jan",
+        status="watching", source_mode="auto",
+        cik="0001045810", ir_url="https://investor.nvidia.com",
+    )
+    session.add(company)
+    await session.flush()
+    session.add_all([
+        m.Source(company_id=company.id, kind="IR",
+                 label="investor.nvidia.com", is_primary=True),
+        m.Source(company_id=company.id, kind="SEC",
+                 label="EDGAR · CIK 0001045810"),
+        m.Price(company_id=company.id, ts=_now(), price=182.4, day_change=2.12),
+    ])
+    await session.commit()
 
 
 # --- Provenance snippets (verbatim from the prototype's data.js) ------------
