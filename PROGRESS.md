@@ -1006,3 +1006,40 @@ Visual QA at 390–430px:
 4. At ≥1024px diff the three screens against pre-change — should be
    byte-for-byte identical.
 
+---
+
+## Bugfix — Examiner overlay didn't load on Railway deploy
+
+**Symptom:** running RUN ALL AGENTS locally opened the interactive
+document-scanning overlay; the same build deployed on Railway never opened
+the overlay.
+
+**Cause:** `web/index.html` referenced the examiner assets at
+`/src/agent-run/examiner.css|.js|-docs.js`. The Vite dev server maps
+`/src/...` to disk, so the three plain `<link>` / `<script defer>` tags
+worked in local dev. Production `vite build` does NOT ship `dist/src/`, so
+on Railway those URLs 404 and `window.AgentRun` was never defined —
+`runAll()` in `AppShell.tsx` then no-op'd.
+
+**Fix:** moved `examiner.css`, `examiner.js`, and `examiner-docs.js` from
+`web/src/agent-run/` to `web/public/agent-run/` (Vite copies `public/`
+verbatim into `dist/`) and changed the three references in
+`web/index.html` from `/src/agent-run/...` to `/agent-run/...`. The empty
+`web/src/agent-run/` directory was removed.
+
+**Verification done**
+- `npm run build` → green, 106 modules, dist now contains
+  `dist/agent-run/{examiner.css,examiner.js,examiner-docs.js}`.
+- `dist/index.html` references `/agent-run/...` directly.
+- `serve.json` `rewrites: **` still falls back to `index.html` only when
+  the real file is missing, so the new asset paths resolve correctly under
+  `serve` on Railway.
+
+**Files touched**
+- `web/index.html`
+- `web/public/agent-run/{examiner.css,examiner.js,examiner-docs.js}` (moved)
+- `web/src/agent-run/` (removed)
+
+**Next step**
+Redeploy to Railway and verify the overlay opens on RUN ALL AGENTS.
+
