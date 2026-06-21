@@ -6,6 +6,11 @@
 /* shell + container query target */
 .app-shell {
   height: 100vh;
+  /* iOS Safari's address bar makes 100vh taller than the visible viewport,
+     which pushes the mobile bottom-nav off-screen and lets the document
+     scroll behind it. dvh tracks the actual visible area; vh stays as a
+     fallback for browsers that don't support dvh yet. */
+  height: 100dvh;
   display: flex;
   container-type: inline-size;
   background: var(--bg);

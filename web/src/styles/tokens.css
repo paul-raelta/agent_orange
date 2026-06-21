@@ -40,6 +40,9 @@ body {
   font-size: 13px;
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
+  /* Stop iOS rubber-banding scrolling the whole document — only .content
+     should scroll, leaving the fixed bottom nav anchored to the viewport. */
+  overflow: hidden;
 }
 button {
   font-family: inherit;
