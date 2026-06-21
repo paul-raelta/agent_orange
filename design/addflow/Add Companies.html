@@ -184,6 +184,36 @@ tr.sel .tcheck{background:var(--accent);border-color:var(--accent);color:#08090b
 .done-hero{text-align:center;padding:60px 20px}
 .done-hero .big{font-size:30px;font-weight:700;letter-spacing:.02em;margin-bottom:8px}
 .done-hero .sub{color:var(--text-2);font-size:12px;font-family:var(--sans);max-width:440px;margin:0 auto 22px}
+
+/* ===== Mobile (recent iPhones ~390–430px) ===== */
+@media (max-width:640px){
+  .screen{padding:20px 15px 130px}
+  .screen-title{font-size:17px}
+  .toolbar{gap:9px}
+  .search{flex:1 1 100%;min-width:0}
+  .sortsel{flex:1}
+  .seg{flex:0 0 auto}
+  .sg-grid{grid-template-columns:1fr;padding:11px}
+  .secgroup-hd{flex-wrap:wrap;gap:9px}
+  .sg-sel{min-width:0}
+  /* table → horizontal scroll instead of clip */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.sp-tbl{min-width:580px}
+  /* selection tray: actions on top row, chips scroll on their own row */
+  .tray-inner{flex-wrap:wrap;padding:11px 15px;gap:10px}
+  .tray-count{order:1}
+  .tray-clear{order:2;margin-left:auto}
+  .tray-inner .btn-primary{order:3}
+  .tray-chips{order:4;flex-basis:100%;max-width:100%}
+  /* discovery rows */
+  .disc-hd{flex-wrap:wrap}
+  .disc-id{min-width:0;flex:1 1 60%}
+  .disc-state{margin-left:auto}
+  .disc-steps{flex-basis:100%;order:3;margin-top:6px}
+  .cand{min-width:0;flex-basis:100%}
+  .done-hero{padding:44px 12px}
+  .done-hero .big{font-size:24px}
+}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>

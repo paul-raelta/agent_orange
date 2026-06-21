@@ -916,3 +916,93 @@ Visual QA in the browser:
 4. Resize the browser ≤700px — the desktop sidebar collapses into the
    mobile tab bar; the HELP item appears alongside the other six.
 
+---
+
+## Increment — Mobile responsive (recent iPhones ~390–430px)
+
+**Goal:** make every Agent Orange view usable at iPhone widths without
+changing the desktop experience. Per `MOBILE.md`, every rule is additive
+and scoped inside a `max-width` / container `(max-width:)` query — at
+≥1024px the rendered DOM is byte-for-byte identical to pre-change.
+
+Three views needed real work; the rest already reflowed via the existing
+`@container (max-width: 700px)` on `.app-shell`.
+
+### 1. Filing Timeline — vertical mobile agenda
+
+- `web/src/screens/Timeline.tsx` — desktop Gantt wrapped in
+  `<div className="tl-desktop">`. New `<div className="tl-mobile">`
+  agenda added below it, built from the same `LANES` constant: one card
+  per ticker (`Glyph` + ticker + `StatusChip`) with REPORTED / PREDICTED
+  / WATCHING rows + period label, ported verbatim from
+  `design/screens/Timeline.tsx`. `StatusChip` added to the primitives
+  import.
+- `web/src/styles/app.css` — `.tla-*` styles copied from
+  `design/styles/app.css` (after `.lg-watching`, before
+  `/* Review queue */`). Toggle added inside the existing
+  `@container (max-width: 700px)` block: `.tl-desktop{display:none}` /
+  `.tl-mobile{display:flex;flex-direction:column;gap:12px}`.
+
+### 2. Add Companies — mobile reflow
+
+- `web/src/styles/app.css` — new `@media (max-width:640px)` block
+  appended after `.ac-done-sub`. Ported from
+  `design/addflow/Add Companies.html`'s mobile rules, remapped to the
+  `.ac-*` class names the web app uses (design used the plain
+  `.toolbar` / `.search` / `.sg-grid` / `.tbl-wrap` / `.sp-tbl` /
+  `.tray-*` / `.disc-*` / `.cand` / `.done-hero` system).
+  - Toolbar gap-tightened; `.ac-search` becomes flex-basis 100%, sort +
+    grid/table seg sit on row 2.
+  - `.ac-grid` collapses to single column.
+  - `.ac-group-hd` wraps; sector select-all stays compact.
+  - **The real defect:** dense table was being clipped. Now
+    `.ac-tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}` +
+    `table.ac-tbl{min-width:580px}`.
+  - Selection tray reflows: count + clear + Add on row 1, chips scroll
+    on row 2 (`.ac-tray-in{flex-wrap:wrap}` + explicit order on
+    `.ac-tray-count` / `.ac-tray-clear` / `.ac-tray-in .btn-primary`
+    / `.ac-tray-chips`).
+  - Discovery rows + candidate cards wrap.
+
+### 3. Feature Flags / LABS panel
+
+- `web/src/styles/app.css` — new `@media (max-width:720px)` block
+  appended after `.sw:disabled`. Note: web/'s Settings page is a single
+  column of `<Panel>` components — the design HTML's `.fd-wrap` /
+  `.fd-rail` two-pane layout doesn't exist here, so the stack-rail-on-
+  top intent is already structurally satisfied (the LABS panel sits
+  above the DATA SOURCES panel in the Settings stack at
+  `Settings.tsx:131-133`). The mobile block therefore tightens
+  `.ff-row` padding/gap + nudges type sizes for narrow screens.
+
+### Compliance with hard rule
+
+- All three rule blocks live inside `max-width:` queries (≤640px / ≤700px
+  container / ≤720px) — at ≥1024px nothing matches, so desktop is
+  byte-for-byte identical.
+- The Timeline JSX adds two new wrapper divs (`.tl-desktop` /
+  `.tl-mobile`); `.tl-mobile` has `display:none` outside the container
+  query, so it contributes only inert markup at desktop widths.
+
+**Verification done**
+- `npm run build` (web) — green: tsc clean, vite built, 107 modules
+  transformed (unchanged), CSS 67.40 KB (was 64.93 KB).
+- No new console errors expected — additive CSS + JSX wrappers only.
+
+**Files touched**
+- `MOBILE.md` (read — no edits)
+- `web/src/screens/Timeline.tsx`
+- `web/src/styles/app.css`
+
+**Next step**
+Visual QA at 390–430px:
+1. `/timeline` — Gantt disappears, vertical agenda renders one card per
+   ticker with REPORTED / PREDICTED / WATCHING rows.
+2. `/companies` → ADD COMPANIES — toolbar stacks, sector grid is single
+   column, TABLE view scrolls horizontally (no clip). Selection tray
+   reflows; discovery rows wrap.
+3. `/settings` — LABS · FEATURE FLAGS panel reads cleanly; toggles align
+   right of each row.
+4. At ≥1024px diff the three screens against pre-change — should be
+   byte-for-byte identical.
+

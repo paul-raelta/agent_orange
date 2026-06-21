@@ -127,6 +127,18 @@ button{font-family:inherit;cursor:pointer;color:inherit;border:none;background:n
 .fd-sw.on::after{transform:translateX(17px);background:var(--accent)}
 .fd-set-note{padding:16px 20px;font-size:10px;color:var(--text-3);font-family:var(--sans);line-height:1.55}
 @media (max-width:920px){.fd-stage{grid-template-columns:1fr}}
+/* ===== Mobile (recent iPhones ~390–430px): stack rail above demo ===== */
+@media (max-width:720px){
+  .fd-wrap{flex-direction:column}
+  .fd-main{order:2}
+  .fd-rail{order:1;width:100%;flex:none;border-left:none;border-bottom:1px solid var(--line);position:static;height:auto}
+  .fd-set-hd{position:static}
+  .fd-bar{padding:12px 16px}
+  .fd-bar-sub{display:none}
+  .fd-stage{padding:16px;gap:14px}
+  .fd-flag-row{padding:14px 16px}
+  .fd-tabs{flex-wrap:wrap}
+}
 </style>
 </head>
 <body>
