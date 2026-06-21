@@ -1043,3 +1043,85 @@ verbatim into `dist/`) and changed the three references in
 **Next step**
 Redeploy to Railway and verify the overlay opens on RUN ALL AGENTS.
 
+---
+
+## Bugfix — Timeline showed removed companies; deep-dive hung on "loading"
+
+**Symptom:** archiving / permanently deleting a company from the watchlist still
+left it on `/timeline`, and clicking that ticker took the user to
+`/company/<TICKER>` which sat on "Loading…" forever.
+
+**Cause:**
+1. `web/src/screens/Timeline.tsx` had a hardcoded `LANES = [NVDA, SNDK, MU]`
+   demo array. Lanes were never driven by the live watchlist, so removed
+   tickers stayed and newly added ones never appeared.
+2. `useCompany` in `web/src/hooks.ts` used React Query's default `retry: 3`
+   with exponential backoff. A 404 from a removed ticker therefore spun
+   through ~3 retries before falling through to the "Unknown company" empty
+   state — long enough to look like an infinite loading state.
+
+**Fix:**
+- Timeline now consumes `useCompanies()`. A `monthFraction()` helper parses
+  `latest.reportedOn` and `nextWindow.from`/`to` ("May 27, 2026") into the
+  fractional month-indices the desktop Gantt + mobile agenda already use.
+  Bar type is derived from `company.status` (validated/review → reported
+  marker + window bar; watching → reported marker + watching bar). Empty
+  watchlist shows a "No companies on the watchlist yet" panel; tickers
+  without a parseable schedule still get a card on mobile with a
+  "NO SCHEDULE YET" row.
+- `useCompany` now sets `retry: false`, so 404s surface the existing
+  "Unknown company" empty state immediately.
+
+**Verification done**
+- `npm run build` → tsc clean, vite built, 106 modules.
+
+**Files touched**
+- `web/src/screens/Timeline.tsx` (rewritten)
+- `web/src/hooks.ts` — `useCompany` no-retry
+
+**Next step**
+Visual QA: archive NVDA from `/company/NVDA`, open `/timeline` and confirm
+NVDA's lane is gone. Add a new ticker via Add Companies and confirm it
+appears on the timeline (empty bars + "NO SCHEDULE YET" on mobile is fine
+for brand-new rows). Manually visit `/company/FOO` for a non-existent
+ticker → "Unknown company "FOO"." renders right away with no spinner.
+
+---
+
+## Bugfix — PERMANENTLY DELETE 500'd silently; company stayed on the list
+
+**Symptom:** archiving a company then clicking PERMANENTLY DELETE on the
+`/companies` ARCHIVED panel did nothing — the row stayed.
+
+**Cause:** `DELETE /api/v1/companies/{ticker}` referenced
+`m.Provenance.company_id`, a column that doesn't exist (Provenance only
+has `metric_id`). SQLAlchemy raised `AttributeError` at expression
+construction, FastAPI 500ed, and the React mutation's `onSuccess` (which
+invalidates the companies + archived-companies queries) never ran.
+Additionally the route didn't clean up `CompanySourceOverride` rows for
+the company, so any per-company source override would leave a dangling
+FK if SQLite enforcement were on.
+
+**Fix:** in `workers/ao/api/routes_companies.py::delete_company`:
+- Walk the Result → Metric → Provenance chain by collecting `metric_ids`
+  from the company's results, then deleting Provenance by `metric_id`,
+  then Metric by `id`, then Result.
+- Add an explicit `delete(CompanySourceOverride).where(company_id == cid)`.
+- Source rows still cascade via the ORM relationship on `await db.delete(row)`.
+
+**Verification done**
+- `python -c "from ao.main import app"` → 46 routes (unchanged).
+- ASGI in-process smoke test: add AAPL → archive → DELETE → 204; archived
+  list no longer contains AAPL; GET `/companies/AAPL` → 404.
+- Confirmed pre-fix bug by direct import: `m.Provenance.company_id` raises
+  `AttributeError`, which would 500 the request regardless of whether any
+  Result / Metric / Provenance rows existed.
+
+**Files touched**
+- `workers/ao/api/routes_companies.py` — `delete_company` rewritten.
+
+**Next step**
+Visual QA: `/company/<ticker>` → ARCHIVE → `/companies` → ARCHIVED → click
+PERMANENTLY DELETE, double-confirm. The row should disappear immediately
+from both panels; `GET /api/v1/companies/<ticker>` returns 404.
+

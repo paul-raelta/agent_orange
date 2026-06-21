@@ -352,27 +352,39 @@ async def delete_company(
             f"Refusing to delete active company '{ticker}'. Archive it first.",
         )
     cid = row.id
-    # Order matters: delete leaves before parents.
+    # Bulk DELETEs bypass ORM cascade, so we walk every FK chain explicitly.
+    # Order matters: leaves before parents (Provenance → Metric → Result;
+    # ReviewCandidate → ReviewItem). Provenance has no company_id column —
+    # we reach it via metric_id (Metric.result_id → Result.company_id).
     result_ids = (await db.execute(
         select(m.Result.id).where(m.Result.company_id == cid)
     )).scalars().all()
     review_ids = (await db.execute(
         select(m.ReviewItem.id).where(m.ReviewItem.company_id == cid)
     )).scalars().all()
+    metric_ids: list[str] = []
+    if result_ids:
+        metric_ids = (await db.execute(
+            select(m.Metric.id).where(m.Metric.result_id.in_(result_ids))
+        )).scalars().all()
     if review_ids:
         await db.execute(
             delete(m.ReviewCandidate).where(m.ReviewCandidate.review_item_id.in_(review_ids))
         )
         await db.execute(delete(m.ReviewItem).where(m.ReviewItem.id.in_(review_ids)))
+    if metric_ids:
+        await db.execute(delete(m.Provenance).where(m.Provenance.metric_id.in_(metric_ids)))
+        await db.execute(delete(m.Metric).where(m.Metric.id.in_(metric_ids)))
     if result_ids:
-        await db.execute(delete(m.Metric).where(m.Metric.result_id.in_(result_ids)))
-    await db.execute(delete(m.Provenance).where(m.Provenance.company_id == cid))
-    await db.execute(delete(m.Result).where(m.Result.company_id == cid))
+        await db.execute(delete(m.Result).where(m.Result.id.in_(result_ids)))
     await db.execute(delete(m.Filing).where(m.Filing.company_id == cid))
     await db.execute(delete(m.Price).where(m.Price.company_id == cid))
     await db.execute(delete(m.News).where(m.News.company_id == cid))
     await db.execute(delete(m.InsiderTx).where(m.InsiderTx.company_id == cid))
     await db.execute(delete(m.AgentRun).where(m.AgentRun.company_id == cid))
+    await db.execute(
+        delete(m.CompanySourceOverride).where(m.CompanySourceOverride.company_id == cid)
+    )
     # Source rows are ORM-cascaded via Company.sources relationship.
     await db.delete(row)
     await db.commit()

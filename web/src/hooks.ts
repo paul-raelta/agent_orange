@@ -115,7 +115,13 @@ export const useArchivedCompanies = () =>
   useQuery({ queryKey: keys.archivedCompanies, queryFn: api.getArchivedCompanies })
 
 export const useCompany = (ticker: string) =>
-  useQuery({ queryKey: keys.company(ticker), queryFn: () => api.getCompany(ticker) })
+  useQuery({
+    queryKey: keys.company(ticker),
+    queryFn: () => api.getCompany(ticker),
+    // 404 / archived ticker — surface the empty state immediately, don't keep
+    // spinning through retries.
+    retry: false,
+  })
 
 function invalidateCompanyLists(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: keys.companies })
