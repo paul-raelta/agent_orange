@@ -7,6 +7,8 @@ import { useTabInk } from '../motion/motion'
 import {
   Btn,
   Conf,
+  ConfidenceBreakdown,
+  ConfidenceGauge,
   Delta,
   Drawer,
   Glyph,
@@ -83,6 +85,7 @@ export function Company() {
     if (!tabs.includes(tab)) setTab('results')
   }, [flags.guidance])  // eslint-disable-line react-hooks/exhaustive-deps
   const [prov, setProv] = useState<Metric | null>(null)
+  const [showConfidence, setShowConfidence] = useState(false)
   const [irUrlInput, setIrUrlInput] = useState('')
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [activeTabBtn, setActiveTabBtn] = useState<HTMLButtonElement | null>(null)
@@ -160,6 +163,9 @@ export function Company() {
           </div>
         </div>
         <div className="co-hd-right">
+          {c.confidence && (
+            <ConfidenceGauge confidence={c.confidence} onClick={() => setShowConfidence(true)} />
+          )}
           <Price price={c.price} change={c.dayChange} />
           <StatusChip status={c.status} pulse />
           <Btn kind="ghost" sm onClick={handleArchive} disabled={archive.isPending}>
@@ -596,6 +602,18 @@ export function Company() {
           <LogList rows={activity ?? []} />
         </Panel>
       )}
+
+      <Drawer
+        open={showConfidence}
+        onClose={() => setShowConfidence(false)}
+        title="FINANCIAL CONFIDENCE"
+      >
+        {c.confidence ? (
+          <ConfidenceBreakdown confidence={c.confidence} />
+        ) : (
+          <p className="drawer-help">No confidence assessment yet.</p>
+        )}
+      </Drawer>
 
       <Drawer
         open={!!prov}

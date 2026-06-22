@@ -2,7 +2,7 @@
    components.jsx. Pure presentational components; no data fetching here. */
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import type { Conf as ConfLevel, Provenance } from '../types'
+import type { Conf as ConfLevel, Confidence, Provenance } from '../types'
 import { STATUS, type Status } from './status'
 import { usePriceFlash } from '../motion/motion'
 
@@ -41,6 +41,118 @@ export function Conf({ level, onClick }: { level: ConfLevel; onClick?: () => voi
       </span>
       {lab}
     </button>
+  )
+}
+
+/* Confidence colour: red→amber→green lerp on a 0-100 pct. Stops mirror the
+   --red/--amber/--green design tokens (tokens.css); hard-coded here so the SVG
+   stroke + numeral can use a computed rgb() without a getComputedStyle round-trip. */
+const CONF_STOPS = {
+  red: [255, 107, 94], // --red  #ff6b5e
+  amber: [227, 165, 46], // --amber #e3a52e
+  green: [78, 199, 122], // --green #4ec77a
+} as const
+
+function lerp(a: number, b: number, t: number) {
+  return Math.round(a + (b - a) * t)
+}
+
+export function confColor(pct: number): string {
+  const p = Math.max(0, Math.min(100, pct))
+  const [from, to, t] =
+    p <= 50
+      ? [CONF_STOPS.red, CONF_STOPS.amber, p / 50]
+      : [CONF_STOPS.amber, CONF_STOPS.green, (p - 50) / 50]
+  const c = [0, 1, 2].map((i) => lerp(from[i], to[i], t))
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+}
+
+const BAND_LABEL: Record<string, string> = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' }
+
+/* Overall financial-confidence gauge: colour-coded % arc. `compact` renders a
+   small ring (watchlist card); default renders the larger header version. */
+export function ConfidenceGauge({
+  confidence,
+  compact = false,
+  onClick,
+}: {
+  confidence: Confidence
+  compact?: boolean
+  onClick?: () => void
+}) {
+  const { pct } = confidence
+  const color = confColor(pct)
+  const size = compact ? 38 : 60
+  const stroke = compact ? 4 : 6
+  const r = (size - stroke) / 2
+  const circ = 2 * Math.PI * r
+  const dash = (Math.max(0, Math.min(100, pct)) / 100) * circ
+  return (
+    <button
+      className={'confg' + (compact ? ' confg-compact' : '') + (onClick ? ' confg-btn' : '')}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+      title="Financial confidence — click for the breakdown"
+      style={{ ['--cf' as string]: color }}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="confg-ring">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        <text x="50%" y="50%" className="confg-num" dominantBaseline="central" textAnchor="middle" fill={color}>
+          {pct}
+        </text>
+      </svg>
+      {!compact && (
+        <span className="confg-meta">
+          <span className="confg-lab">CONFIDENCE</span>
+          <span className="confg-band" style={{ color }}>{BAND_LABEL[confidence.band] || confidence.band}</span>
+        </span>
+      )}
+    </button>
+  )
+}
+
+/* Confidence breakdown body — for use inside a Drawer. Summary + per-factor
+   rows (weight, impact dot, signal tag, one-line detail). */
+export function ConfidenceBreakdown({ confidence }: { confidence: Confidence }) {
+  const impactColor: Record<string, string> = {
+    positive: 'var(--green)',
+    neutral: 'var(--text-3)',
+    negative: 'var(--red)',
+  }
+  return (
+    <>
+      <div className="cfb-head">
+        <span className="cfb-pct" style={{ color: confColor(confidence.pct) }}>{confidence.pct}%</span>
+        <span className="cfb-band">{BAND_LABEL[confidence.band] || confidence.band} CONFIDENCE</span>
+      </div>
+      <p className="cfb-summary">{confidence.summary}</p>
+      <div className="cfb-factors">
+        {confidence.factors.map((f, i) => (
+          <div className="cfb-factor" key={i}>
+            <div className="cfb-factor-top">
+              <span className="cfb-dot" style={{ background: impactColor[f.impact] || 'var(--text-3)' }} />
+              <span className="cfb-factor-name">{f.name}</span>
+              <span className="cfb-weight">{Math.round(f.weight * 100)}%</span>
+            </div>
+            {f.signal && <span className="cfb-signal">{f.signal}</span>}
+            <p className="cfb-detail">{f.detail}</p>
+          </div>
+        ))}
+      </div>
+      {confidence.computedAt && (
+        <p className="cfb-ts">assessed {confidence.computedAt}</p>
+      )}
+    </>
   )
 }
 

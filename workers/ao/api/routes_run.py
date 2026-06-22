@@ -39,9 +39,15 @@ async def _bg_run(user_id: str, ticker: str) -> None:
 async def _bg_run_all(user_id: str) -> None:
     """One-click full refresh: pipeline per company, plus price/news/insider
     pulls and window recompute. So a freshly-wiped UI lights up fully after
-    a single RUN ALL AGENTS click."""
+    a single RUN ALL AGENTS click.
+
+    Data refreshes the confidence score reads (prices, history backfill,
+    news/insider) run BEFORE the per-company pipeline so each pipeline's
+    confidence assessment sees fresh inputs. Window recompute runs last so it
+    reflects any filings the pipeline just discovered."""
     from ao.scheduler.jobs import (
-        recompute_windows, refresh_news_insider, refresh_prices,
+        backfill_prices, recompute_windows, refresh_news_insider,
+        refresh_prices,
     )
 
     Session = get_sessionmaker()
@@ -52,23 +58,30 @@ async def _bg_run_all(user_id: str) -> None:
             )
         )).all()
 
-    # Per-company pipeline (monitor → extract → validate → narrative → notify).
+    # Pre-pipeline data refreshes — confidence reads these.
+    for label, fn in (
+        ("prices", refresh_prices),
+        ("backfill_prices", backfill_prices),
+        ("news_insider", refresh_news_insider),
+    ):
+        try:
+            await fn()
+        except Exception as exc:  # noqa: BLE001
+            log.error("bg_run_all.side_refresh_failed", step=label, error=str(exc))
+
+    # Per-company pipeline (monitor → extract → validate → narrative →
+    # confidence → notify).
     for (ticker,) in rows:
         try:
             await _bg_run(user_id, ticker)
         except Exception as exc:  # noqa: BLE001
             log.error("bg_run_all.company_failed", ticker=ticker, error=str(exc))
 
-    # Side-channel refreshes — populate the rest of the UI.
-    for label, fn in (
-        ("prices", refresh_prices),
-        ("news_insider", refresh_news_insider),
-        ("windows", recompute_windows),
-    ):
-        try:
-            await fn()
-        except Exception as exc:  # noqa: BLE001
-            log.error("bg_run_all.side_refresh_failed", step=label, error=str(exc))
+    # Window recompute last — reflects newly discovered filings.
+    try:
+        await recompute_windows()
+    except Exception as exc:  # noqa: BLE001
+        log.error("bg_run_all.side_refresh_failed", step="windows", error=str(exc))
 
 router = APIRouter(tags=["run"])
 

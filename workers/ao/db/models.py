@@ -320,6 +320,34 @@ class InsiderTx(Base):
     filing_url: Mapped[str] = mapped_column(String, default="")
 
 
+# --- overall financial-confidence assessment --------------------------------
+class ConfidenceAssessment(Base):
+    """Company-level LLM confidence score (0-100) blending inter-document
+    agreement, cross-source consistency, insider/news activity, and share-price
+    trend alignment. Recomputed daily and on every new filing; only the most
+    recent row per company has is_latest=True. The factor breakdown + the
+    deterministic stats fed to the model are stored as JSON-as-TEXT for
+    transparency and audit (portability rule: no native JSON column)."""
+
+    __tablename__ = "confidence_assessments"
+    __table_args__ = (
+        Index("ix_confidence_company_latest", "company_id", "is_latest"),
+        Index("ix_confidence_company_time", "company_id", "computed_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    company_id: Mapped[str] = mapped_column(String, ForeignKey("companies.id"), nullable=False)
+    overall_pct: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
+    band: Mapped[str] = mapped_column(String, default="medium")  # high|medium|low
+    summary: Mapped[str] = mapped_column(Text, default="")
+    factors_json: Mapped[str] = mapped_column(Text, default="[]")  # JSON list as TEXT
+    inputs_json: Mapped[str] = mapped_column(Text, default="{}")  # stats fed to the LLM
+    prompt_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_latest: Mapped[bool] = mapped_column(Boolean, default=False)
+    computed_at: Mapped[str] = mapped_column(String, default=_now_iso, nullable=False)
+
+
 # --- routing + providers + settings -----------------------------------------
 class RoutingRule(Base):
     __tablename__ = "routing_rules"

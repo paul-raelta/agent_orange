@@ -17,6 +17,8 @@ TASK_NAMES = {
     "validation": "Validation",
     # narrative isn't a separate routing row in v1 — reuses validation's model.
     "narrative": "Validation",
+    # confidence isn't a separate routing row in v1 — reuses validation's model.
+    "confidence": "Validation",
     # help isn't user-configurable: the assistant is grounded by the corpus and
     # the cheap fast model is the right call. Pinned via settings, no DB row.
     "help": "Help",
@@ -56,6 +58,7 @@ async def model_for(session: AsyncSession, user_id: str, stage: str) -> str:
             "extraction": s.default_model_extraction,
             "validation": s.default_model_validation,
             "narrative": s.default_model_narrative,
+            "confidence": s.default_model_validation,
             "help": s.default_model_help,
         }.get(stage, s.default_model_extraction)
     return DISPLAY_TO_ID.get(row.model, row.model)

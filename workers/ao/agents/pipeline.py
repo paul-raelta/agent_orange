@@ -15,7 +15,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ao.agents import extraction, monitoring, narrative, validation
+from ao.agents import confidence, extraction, monitoring, narrative, validation
 from ao.agents.runlog import run_log
 from ao.db import models as m
 from ao.integrations import edgar_client
@@ -173,6 +173,13 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
         if story:
             result_row.narrative = story
             await session.commit()
+
+    # --- 6b. Confidence assessment ------------------------------------
+    # Runs regardless of validation outcome: a failed validation is itself a
+    # low-confidence signal that should drag the score down.
+    await confidence.assess_confidence(
+        session, user_id, company_id=company.id, ticker=ticker,
+    )
 
     # --- 7. Notify ----------------------------------------------------
     if verdict and verdict.passed:

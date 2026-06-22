@@ -65,6 +65,18 @@ async def start_scheduler() -> AsyncIOScheduler:
         CronTrigger(hour=0, minute=5),
         id="recompute-windows", replace_existing=True,
     )
+    # Daily price-history backfill (00:10) → confidence recompute (00:15),
+    # ordered after windows so each step reads the freshest upstream data.
+    scheduler.add_job(
+        jobs.backfill_prices,
+        CronTrigger(hour=0, minute=10),
+        id="backfill-prices", replace_existing=True,
+    )
+    scheduler.add_job(
+        jobs.recompute_confidence,
+        CronTrigger(hour=0, minute=15),
+        id="recompute-confidence", replace_existing=True,
+    )
 
     scheduler.start()
     _scheduler = scheduler

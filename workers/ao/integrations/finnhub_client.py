@@ -1,15 +1,15 @@
 """Finnhub REST wrapper.
 
-Three endpoints used: /quote, /company-news, /stock/insider-transactions.
-Free tier: 60 req/min. Token-bucket at 50/min to leave headroom; on 429 we log
-and let the caller retry on the next scheduler tick.
+Four endpoints used: /quote, /company-news, /stock/insider-transactions,
+/stock/candle. Free tier: 60 req/min. Token-bucket at 50/min to leave
+headroom; on 429 we log and let the caller retry on the next scheduler tick.
 
 If FINNHUB_API_KEY is missing, all functions return empty lists / None — the
 scheduler still ticks, just with no fresh data.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -69,3 +69,41 @@ async def insider_transactions(symbol: str) -> list[dict]:
             client, "/stock/insider-transactions", {"symbol": symbol},
         )
     return (data or {}).get("data", []) if isinstance(data, dict) else []
+
+
+async def stock_candles(
+    symbol: str, *, days: int = 365, resolution: str = "D",
+) -> list[dict]:
+    """Daily price history as [{ts: iso-date, close: float}], oldest→newest.
+
+    NOTE: /stock/candle is premium on the current free tier and commonly
+    returns 403 / {"s": "no_data"}. We treat any non-"ok" response as "no
+    history available" and return [] so callers fall back to the price
+    snapshots accumulated by refresh_prices.
+    """
+    if not is_configured():
+        return []
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+    async with httpx.AsyncClient() as client:
+        data = await _get(
+            client, "/stock/candle",
+            {
+                "symbol": symbol, "resolution": resolution,
+                "from": int(start.timestamp()), "to": int(now.timestamp()),
+            },
+        )
+    if not isinstance(data, dict) or data.get("s") != "ok":
+        return []
+    closes = data.get("c") or []
+    stamps = data.get("t") or []
+    out: list[dict] = []
+    for close, t in zip(closes, stamps):
+        try:
+            ts = datetime.fromtimestamp(int(t), tz=timezone.utc).isoformat(
+                timespec="seconds"
+            )
+            out.append({"ts": ts, "close": float(close)})
+        except (ValueError, TypeError, OSError):
+            continue
+    return out

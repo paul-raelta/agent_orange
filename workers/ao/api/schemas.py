@@ -68,6 +68,29 @@ class Validation(WireBase):
     conflict: bool | None = None
 
 
+ConfidenceBand = Literal["high", "medium", "low"]
+ConfidenceImpact = Literal["positive", "neutral", "negative"]
+
+
+class ConfidenceFactor(WireBase):
+    name: str
+    weight: float
+    impact: ConfidenceImpact
+    signal: str
+    detail: str
+
+
+class Confidence(WireBase):
+    """Overall LLM financial-confidence score for a company. `pct` (0-100) is
+    the headline; `band` is the canonical label derived from pct; `factors` is
+    the transparent breakdown driving the score."""
+    pct: int
+    band: ConfidenceBand
+    summary: str
+    factors: list[ConfidenceFactor] = Field(default_factory=list)
+    computedAt: str
+
+
 class Source(WireBase):
     kind: SourceKind
     label: str
@@ -205,6 +228,9 @@ class Company(WireBase):
     # New fields
     portfolio: Portfolio
     narrative: str | None = None
+    # Overall financial-confidence score (replaces the per-metric high/med/low
+    # as the headline). Null until the first assessment has been computed.
+    confidence: Confidence | None = None
     # Only set on GET /companies/{ticker}; list endpoint omits these
     news: list[NewsItem] | None = None
     insider: list[InsiderTx] | None = None

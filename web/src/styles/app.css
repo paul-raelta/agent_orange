@@ -356,6 +356,136 @@
   background: rgba(255, 107, 94, 0.08);
 }
 
+/* Overall financial-confidence gauge (colour-coded % ring) */
+.confg {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.confg-btn {
+  cursor: pointer;
+}
+.confg-ring {
+  display: block;
+  flex: none;
+}
+.confg-num {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 17px;
+}
+.confg-compact .confg-num {
+  font-size: 12px;
+}
+.confg-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+.confg-lab {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  font-weight: 600;
+}
+.confg-band {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.confg-btn:hover .confg-band {
+  text-decoration: underline;
+}
+
+.wl-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Confidence breakdown (inside the drawer) */
+.cfb-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.cfb-pct {
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 700;
+}
+.cfb-band {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.cfb-summary {
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.cfb-factors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cfb-factor {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  background: var(--panel-2);
+}
+.cfb-factor-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cfb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.cfb-factor-name {
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+}
+.cfb-weight {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.cfb-signal {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.cfb-detail {
+  font-size: 11.5px;
+  color: var(--text-2);
+  line-height: 1.45;
+  margin: 6px 0 0;
+}
+.cfb-ts {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 14px;
+}
+
 .delta {
   font-size: 11px;
   font-weight: 600;

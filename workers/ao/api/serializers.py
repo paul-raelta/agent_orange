@@ -176,6 +176,36 @@ async def serialize_company(
         label=c.next_window_label or "",
     )
 
+    # --- overall confidence (latest assessment) -------------------------
+    conf_row = (await session.execute(
+        select(m.ConfidenceAssessment).where(
+            m.ConfidenceAssessment.company_id == c.id,
+            m.ConfidenceAssessment.is_latest == True,  # noqa: E712
+        )
+    )).scalar_one_or_none()
+    confidence: s.Confidence | None = None
+    if conf_row is not None:
+        try:
+            factors = json.loads(conf_row.factors_json or "[]")
+        except (ValueError, TypeError):
+            factors = []
+        confidence = s.Confidence(
+            pct=int(conf_row.overall_pct or 0),
+            band=conf_row.band or "medium",  # type: ignore[arg-type]
+            summary=conf_row.summary or "",
+            factors=[
+                s.ConfidenceFactor(
+                    name=f.get("name", ""),
+                    weight=float(f.get("weight", 0.0)),
+                    impact=f.get("impact", "neutral"),
+                    signal=f.get("signal", ""),
+                    detail=f.get("detail", ""),
+                )
+                for f in factors
+            ],
+            computedAt=conf_row.computed_at,
+        )
+
     # --- optional news + insider ----------------------------------------
     news: list[s.NewsItem] | None = None
     insider: list[s.InsiderTx] | None = None
@@ -216,6 +246,7 @@ async def serialize_company(
         sparkEps=sparkEps, sparkLabels=sparkLabels,
         nextWindow=nextWindow, history=history,
         portfolio=portfolio, narrative=narrative,
+        confidence=confidence,
         news=news, insider=insider,
         archivedAt=c.archived_at,
         irUrl=c.ir_url,

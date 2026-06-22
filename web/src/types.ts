@@ -30,6 +30,26 @@ export type Validation = {
   conflict?: boolean
 }
 
+/* Overall LLM financial-confidence score (company-level). `pct` (0-100) is the
+   colour-coded headline; `band` is the canonical label derived from pct;
+   `factors` is the transparent breakdown that drove the score. */
+export type ConfidenceBand = 'high' | 'medium' | 'low'
+export type ConfidenceImpact = 'positive' | 'neutral' | 'negative'
+export type ConfidenceFactor = {
+  name: string
+  weight: number
+  impact: ConfidenceImpact
+  signal: string
+  detail: string
+}
+export type Confidence = {
+  pct: number
+  band: ConfidenceBand
+  summary: string
+  factors: ConfidenceFactor[]
+  computedAt: string
+}
+
 export type Source = {
   kind: 'IR' | 'SEC'
   label: string
@@ -179,6 +199,9 @@ export type Company = {
   portfolio: Portfolio
   /* AI "what's worth knowing" — present on deep-dive once validation passes. */
   narrative: string | null
+  /* Overall financial-confidence score — the headline metric. Null until the
+     first assessment has been computed for this company. */
+  confidence?: Confidence | null
   /* Populated on the deep-dive (GET /companies/:ticker); omitted by the list endpoint. */
   news?: NewsItem[] | null
   insider?: InsiderTx[] | null

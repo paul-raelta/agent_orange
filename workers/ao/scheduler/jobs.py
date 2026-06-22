@@ -9,11 +9,12 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from ao.agents import source_registry
+from ao.agents import confidence, source_registry
 from ao.agents.pipeline import run_one
 from ao.config import get_settings
 from ao.db import models as m
 from ao.db.engine import get_sessionmaker
+from ao.integrations import finnhub_client
 from ao.logging import get_logger
 from ao.scheduler.cadence import compute_next_window
 
@@ -73,6 +74,116 @@ async def refresh_prices() -> None:
                 break  # first source with a good answer wins
         await session.commit()
     log.info("scheduler.prices_refreshed", count=len(rows))
+
+
+async def backfill_prices() -> None:
+    """Pull ~1y of daily price candles per tracked company into the prices
+    table so the confidence-score trend factor has history. Runs daily.
+
+    Finnhub's /stock/candle is premium on the free tier and often returns no
+    data — in that case nothing is inserted and the trend falls back to the
+    snapshots refresh_prices accumulates. De-dupes on existing (company, date)
+    so re-runs are idempotent and back-dated rows never disturb _latest_price."""
+    user_id = get_settings().user_id
+    Session = get_sessionmaker()
+    async with Session() as session:
+        # Gate on the quote source: if it's globally disabled there's nothing
+        # to backfill. Per-company overrides are applied per company below.
+        global_sources = await source_registry.enabled_for(
+            session, user_id, kind="quote",
+        )
+        if not global_sources:
+            log.info("scheduler.backfill_skipped_no_sources")
+            return
+        rows = (await session.execute(
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
+        )).scalars().all()
+        inserted = 0
+        for c in rows:
+            sources = await source_registry.enabled_for(
+                session, user_id, kind="quote", company_id=c.id,
+            )
+            if not sources:
+                continue
+            try:
+                candles = await finnhub_client.stock_candles(c.ticker, days=365)
+            except Exception as exc:  # noqa: BLE001
+                await source_registry.record_fetch(
+                    session, user_id, "finnhub_quote", ok=False, error=str(exc),
+                )
+                continue
+            if not candles:
+                continue
+            # Dates already stored for this company — skip them.
+            seen_dates = {
+                (ts or "")[:10]
+                for (ts,) in (await session.execute(
+                    select(m.Price.ts).where(m.Price.company_id == c.id)
+                )).all()
+            }
+            for bar in candles:
+                day = (bar.get("ts") or "")[:10]
+                if not day or day in seen_dates:
+                    continue
+                seen_dates.add(day)
+                session.add(m.Price(
+                    id=uuid4().hex, company_id=c.id, ts=bar["ts"],
+                    price=float(bar["close"]), day_change=0.0,
+                ))
+                inserted += 1
+            await source_registry.record_fetch(
+                session, user_id, "finnhub_quote", ok=True,
+            )
+        await session.commit()
+    log.info("scheduler.prices_backfilled", inserted=inserted)
+
+
+async def recompute_confidence() -> None:
+    """Daily recompute of the overall confidence score for every company.
+
+    Cost-aware: skips a company whose latest assessment is < 20h old, so the
+    daily tick and a same-day filing-triggered recompute don't double-bill.
+    Per-company failures are isolated so one bad ticker doesn't abort the run."""
+    user_id = get_settings().user_id
+    Session = get_sessionmaker()
+    async with Session() as session:
+        rows = (await session.execute(
+            select(m.Company).where(
+                m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+            )
+        )).scalars().all()
+        done = 0
+        for c in rows:
+            latest = (await session.execute(
+                select(m.ConfidenceAssessment.computed_at).where(
+                    m.ConfidenceAssessment.company_id == c.id,
+                    m.ConfidenceAssessment.is_latest == True,  # noqa: E712
+                )
+            )).scalar_one_or_none()
+            if latest and _hours_since(latest) < 20:
+                continue
+            try:
+                await confidence.assess_confidence(
+                    session, user_id, company_id=c.id, ticker=c.ticker,
+                )
+                done += 1
+            except Exception as exc:  # noqa: BLE001
+                log.warning("scheduler.confidence_failed", ticker=c.ticker, error=str(exc))
+        log.info("scheduler.confidence_recomputed", count=done)
+
+
+def _hours_since(iso_ts: str) -> float:
+    """Hours between an ISO timestamp and now. Returns inf if unparseable so a
+    bad timestamp never blocks a recompute."""
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
+    except (ValueError, TypeError):
+        return float("inf")
 
 
 async def refresh_news_insider() -> None:

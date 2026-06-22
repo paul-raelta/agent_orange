@@ -1,7 +1,7 @@
 /* Agent Orange — Watchlist (default route, §5.1). At-a-glance status of every
    tracked company. */
 import { useNavigate } from 'react-router-dom'
-import { Btn, Conf, Delta, Glyph, Price, Spark, StatusChip } from '../components/primitives'
+import { Btn, Conf, ConfidenceGauge, Delta, Glyph, Price, Spark, StatusChip } from '../components/primitives'
 import { CountUp, Reveal, SkeletonCard } from '../motion/motion'
 import { useCompanies, useFeatureFlags, usePortfolioTotals } from '../hooks'
 import { useShell } from '../layout/shellContext'
@@ -167,7 +167,16 @@ function CompanyCard({
             <div className="wl-name">{c.name}</div>
           </div>
         </div>
-        {beat ? <BeatBadge kind={beat.kind} pct={beat.pct} /> : <StatusChip status={c.status} pulse />}
+        <div className="wl-card-top-right">
+          {c.confidence && (
+            <ConfidenceGauge
+              confidence={c.confidence}
+              compact
+              onClick={onOpen}
+            />
+          )}
+          {beat ? <BeatBadge kind={beat.kind} pct={beat.pct} /> : <StatusChip status={c.status} pulse />}
+        </div>
       </div>
 
       <div className="wl-pricerow">

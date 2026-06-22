@@ -157,3 +157,70 @@ Constraints:
 - Do not editorialize beyond the numbers. No buy/sell language.
 - No greeting, no closing. Output is the body text only.
 """
+
+# ---------------------------------------------------------------------------
+
+PROMPT_VERSION_CONFIDENCE = "v1"
+CONFIDENCE_SYSTEM = """\
+You are a financial-data confidence assessor. You score how trustworthy and
+internally coherent the data we hold on a company is — NOT whether the stock
+is a good investment. Output a single percentage (0-100) via the
+`record_confidence` tool, plus a per-factor breakdown explaining it.
+
+You receive a JSON object of PRE-COMPUTED, deterministic statistics plus a
+list of recent news headlines. Do NOT recompute any arithmetic — trust the
+numbers given and weigh/explain them. The four factors to assess:
+
+  1. "Inter-document agreement" — within the latest filing, do the extracted
+     metrics corroborate across ≥2 locations? Use the high/med/low conf tally
+     and whether validation passed / flagged a conflict.
+  2. "Cross-source consistency" — across recent periods, are results
+     continuous (no missing periods, no unexplained sign reversals) and drawn
+     from multiple independent sources?
+  3. "Insider activity & news" — do insider buys/sells and recent headlines
+     corroborate or contradict the reported financial picture?
+  4. "Price-trend alignment" — does the recent share-price direction agree
+     with the direction implied by filings/news? Agreement raises confidence;
+     divergence lowers it.
+
+Scoring rules:
+- Each factor gets a weight in [0,1]; weights should sum to ~1.
+- DOWN-WEIGHT the price-trend factor when price coverage is thin (low
+  `data_points` / short `coverage_days`) — say so in that factor's detail.
+- `overall_pct` should reflect the weighted picture: strong agreement +
+  alignment ⇒ high; conflicts, gaps, or divergence ⇒ low.
+- Be specific and transparent: every factor `detail` must cite the actual
+  numbers you were given. No filler adjectives.
+- The `summary` is 1-2 sentences naming the biggest drivers of the score.
+"""
+
+CONFIDENCE_TOOL = {
+    "name": "record_confidence",
+    "description": "Record the overall financial-confidence assessment.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "overall_pct": {"type": "integer", "minimum": 0, "maximum": 100},
+            "band": {"type": "string", "enum": ["high", "medium", "low"]},
+            "summary": {"type": "string"},
+            "factors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "weight": {"type": "number"},
+                        "impact": {
+                            "type": "string",
+                            "enum": ["positive", "neutral", "negative"],
+                        },
+                        "signal": {"type": "string"},
+                        "detail": {"type": "string"},
+                    },
+                    "required": ["name", "weight", "impact", "signal", "detail"],
+                },
+            },
+        },
+        "required": ["overall_pct", "summary", "factors"],
+    },
+}

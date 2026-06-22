@@ -1217,3 +1217,62 @@ gated on `!CI`) and pre-install chromium in the workflow image. Keep
 considering whether `wipe()` should reseed review items so spec 05 can stop
 shelling out to Python.
 
+
+---
+
+## Overall LLM Financial Confidence % (replaces per-metric high/med/low headline)
+
+**Goal**
+Replace the headline confidence indicator (per-metric high/med/low, which only
+measured inter-document agreement within one filing) with a company-level,
+LLM-derived financial-confidence PERCENTAGE (0-100), colour-coded red→amber→green,
+with a transparent factor-by-factor breakdown. The score blends: (a) inter-doc
+agreement on filings (the existing validation, folded in), (b) cross-source/
+cross-period consistency, (c) insider activity + news, (d) share-price trend and
+whether filings/news direction aligns with recent price direction.
+
+**Key decisions (why)**
+- Dedicated `confidence_assessments` table, not columns on `Result`: the score is
+  per-company and recomputed daily independent of filing periods (`Result.is_latest`
+  rotates). Breakdown stored as JSON-as-TEXT per the portability rules. New table →
+  auto-created by `create_all()`, no `_COLUMN_MIGRATIONS` entry needed.
+- Deterministic stats computed in code (agreement tally, EPS continuity, insider
+  buy/sell, price slope/% changes, alignment); the LLM only weighs + explains, never
+  does math. Audit trail stored in `inputs_json`.
+- Band (high/medium/low) always re-derived from pct in code (`confidence.band_for`:
+  ≥70/≥40/<40) so colour and label can never disagree; the LLM's proposed band is ignored.
+- Recompute daily (scheduler) + on every new filing (pipeline). Daily job has a 20h
+  idempotency guard so a same-day filing recompute doesn't double-bill Opus.
+- Historical price: added `finnhub_client.stock_candles` + daily `backfill_prices`
+  job storing into the existing `prices` table. `/stock/candle` is premium → on
+  no-data it returns [] and the trend falls back to accumulated snapshots; thin
+  coverage is signalled to the LLM via `data_points`/`coverage_days` to down-weight.
+- Per-metric high/med/low badges kept in the validation tab / provenance drawer as
+  supporting detail; the % is the new headline.
+
+**Changed files**
+- Backend: `db/models.py` (ConfidenceAssessment), `agents/confidence.py` (new stage),
+  `agents/prompts.py` (CONFIDENCE_SYSTEM/TOOL + PROMPT_VERSION_CONFIDENCE),
+  `agents/registry.py` (confidence→Validation routing), `agents/pipeline.py` (call
+  after narrative), `scheduler/jobs.py` (backfill_prices, recompute_confidence,
+  _hours_since), `scheduler/scheduler.py` (00:10/00:15 jobs), `api/routes_run.py`
+  (RUN ALL reordered: data refreshes before pipelines), `api/schemas.py` +
+  `api/serializers.py` (Confidence wire type on Company),
+  `integrations/finnhub_client.py` (stock_candles).
+- Frontend: `types.ts` (Confidence types), `components/primitives.tsx`
+  (ConfidenceGauge + ConfidenceBreakdown + confColor lerp), `screens/Company.tsx`
+  (header gauge + breakdown drawer), `screens/Watchlist.tsx` (compact card gauge),
+  `styles/app.css` (.confg*, .cfb*).
+
+**Verified**
+- `npm run build` (tsc + vite) clean; backend imports clean; ruff clean on new code
+  (only pre-existing unused `desc` import in pipeline.py remains, untouched).
+- Live DB checks: `confidence_assessments` table created with all columns; stat
+  assembly runs on empty + populated companies without crashing; serializer returns
+  None pre-assessment and a populated Confidence after; trend math (rising series →
+  slope +1, +% changes, aligns_with_price True); 20h guard helper correct.
+
+**Next step**
+Manual UI smoke with a real ANTHROPIC_API_KEY (run pipeline for a ticker, confirm
+gauge + breakdown render and colour matches pct). Optionally add a Playwright spec
+for the confidence gauge/drawer.
