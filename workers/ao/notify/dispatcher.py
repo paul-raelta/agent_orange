@@ -82,6 +82,7 @@ def _split_recipients(s: str) -> list[str]:
 
 def _subject_and_body(event: Event) -> tuple[str, str]:
     pl = event.payload or {}
+    app_url = get_settings().app_url
     if event.type == "validated":
         subj = f"✓ {event.ticker} results validated"
         body = (
@@ -89,24 +90,30 @@ def _subject_and_body(event: Event) -> tuple[str, str]:
             f"Period: {pl.get('period', '?')} · "
             f"Revenue: {pl.get('revenue', '?')} · "
             f"EPS diluted: {pl.get('eps_diluted', '?')}\n"
-            "Open the app to see the full breakdown."
+            f"Open the app to see the full breakdown: {app_url}"
         )
     elif event.type == "review.added":
         subj = f"⚑ {event.ticker} — needs review"
         body = (
             f"{event.ticker} — {pl.get('field', '?')} couldn't be auto-validated.\n"
             f"Reason: {pl.get('reason', '?')}\n"
-            "Open the Review Queue to decide."
+            f"Open the Review Queue to decide: {app_url}"
         )
     elif event.type == "budget_80":
         subj = "Agent Orange — month spend hit 80%"
-        body = f"This month: ${pl.get('cost', '?')} of ${pl.get('budget', '?')} budget."
+        body = (
+            f"This month: ${pl.get('cost', '?')} of ${pl.get('budget', '?')} budget.\n"
+            f"Open the app: {app_url}"
+        )
     elif event.type == "watching_started":
         subj = f"👀 Watching window opened for {event.ticker}"
-        body = f"{event.ticker} — predicted filing window has started."
+        body = (
+            f"{event.ticker} — predicted filing window has started.\n"
+            f"Open the app: {app_url}"
+        )
     else:
         subj = f"Agent Orange — {event.type}"
-        body = json.dumps(asdict(event), indent=2)
+        body = json.dumps(asdict(event), indent=2) + f"\n\n{app_url}"
     return subj, body
 
 

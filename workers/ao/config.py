@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     # The user_id every row is keyed by. Stable across restarts.
     user_id: str = "u_local"
 
+    # --- App URL (used in outbound notifications so the link is clickable) ---
+    app_url: str = Field(
+        "https://agentorange-production.up.railway.app/", alias="APP_URL"
+    )
+
     # --- EDGAR ---
     # Required by SEC: declare a real contact in the User-Agent.
     @property
