@@ -70,14 +70,19 @@ async def create_all() -> None:
 
 
 # Columns added to existing tables after the initial schema was first applied.
-# Each entry is (table, column, type) — SQLite ALTER TABLE ADD COLUMN.
-# create_all() handles new tables; this list handles new columns.
-_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
-    ("companies", "archived_at", "TEXT"),
-    ("companies", "logo_url", "TEXT"),
-    ("results", "eps_gaap_value", "REAL"),
-    ("results", "eps_non_gaap_value", "REAL"),
-    ("results", "eps_sign_flip", "INTEGER DEFAULT 0"),
+# Each entry is (table, column, {dialect: type}). create_all() handles new
+# tables; this list handles new columns on existing tables, idempotently.
+# The Postgres type strings match what SQLAlchemy emits for the equivalent
+# model columns (String → TEXT, Float → DOUBLE PRECISION, Boolean → BOOLEAN).
+_COLUMN_MIGRATIONS: list[tuple[str, str, dict[str, str]]] = [
+    ("companies", "archived_at", {"sqlite": "TEXT", "postgresql": "TEXT"}),
+    ("companies", "logo_url", {"sqlite": "TEXT", "postgresql": "TEXT"}),
+    ("results", "eps_gaap_value",
+     {"sqlite": "REAL", "postgresql": "DOUBLE PRECISION"}),
+    ("results", "eps_non_gaap_value",
+     {"sqlite": "REAL", "postgresql": "DOUBLE PRECISION"}),
+    ("results", "eps_sign_flip",
+     {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
 ]
 
 
@@ -86,17 +91,23 @@ async def ensure_schema() -> None:
 
     Called from the API lifespan startup AND the daemon's startup so an
     existing seed-from-an-older-version DB self-heals without requiring a
-    re-seed or manual ALTER. Both processes can race this safely: the
-    PRAGMA check + the swallowed "duplicate column" error make ALTER
-    runs cooperative.
+    re-seed or manual ALTER. Both processes can race this safely: existence
+    checks + "IF NOT EXISTS" on Postgres + a swallowed duplicate-column
+    error on SQLite make repeated runs cooperative.
     """
     await create_all()
     engine = get_engine()
-    if not str(engine.url).startswith("sqlite"):
-        # ALTER TABLE syntax differs on Postgres; revisit when we migrate.
-        return
+    url = str(engine.url)
+    if url.startswith("sqlite"):
+        await _ensure_columns_sqlite(engine)
+    elif url.startswith("postgresql"):
+        await _ensure_columns_postgres(engine)
+
+
+async def _ensure_columns_sqlite(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
-        for table, column, type_ in _COLUMN_MIGRATIONS:
+        for table, column, types in _COLUMN_MIGRATIONS:
+            type_ = types["sqlite"]
             rows = (
                 await conn.exec_driver_sql(f"PRAGMA table_info({table})")
             ).fetchall()
@@ -107,12 +118,22 @@ async def ensure_schema() -> None:
                 await conn.exec_driver_sql(
                     f"ALTER TABLE {table} ADD COLUMN {column} {type_}"
                 )
-            except Exception as exc:  # noqa: BLE001
-                # Race: another process (api ↔ daemon) added the column
-                # between PRAGMA and ALTER. Re-check; only re-raise if it
-                # genuinely failed.
+            except Exception:  # noqa: BLE001
+                # Race: another process added the column between PRAGMA and
+                # ALTER. Re-check; only re-raise if it genuinely failed.
                 rows2 = (
                     await conn.exec_driver_sql(f"PRAGMA table_info({table})")
                 ).fetchall()
                 if column not in {r[1] for r in rows2}:
                     raise
+
+
+async def _ensure_columns_postgres(engine: AsyncEngine) -> None:
+    # Postgres ≥ 9.6 supports ADD COLUMN IF NOT EXISTS, which is racing-safe
+    # across replicas — no need for a pre-check or duplicate-column swallow.
+    async with engine.begin() as conn:
+        for table, column, types in _COLUMN_MIGRATIONS:
+            type_ = types["postgresql"]
+            await conn.exec_driver_sql(
+                f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{column}" {type_}'
+            )
