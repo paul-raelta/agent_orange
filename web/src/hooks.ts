@@ -436,6 +436,10 @@ export const useWipe = () => {
   return useMutation({
     mutationFn: api.wipe,
     onSuccess: () => {
+      // Universe payload is mirrored to localStorage so the Add Companies
+      // grid renders instantly on cold visits; drop it so the post-wipe
+      // mount doesn't seed `initialData` with stale `tracked: true` flags.
+      try { localStorage.removeItem(UNIVERSE_LS_KEY) } catch { /* ignore */ }
       // After wipe every read changes — drop the whole cache.
       qc.invalidateQueries()
     },
