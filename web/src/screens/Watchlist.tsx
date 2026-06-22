@@ -299,7 +299,9 @@ function CompanyCard({
                   onReview()
                 }}
               >
-                ⚑ 2 items need your review →
+                ⚑ {c.openReviewCount ?? 1}{' '}
+                {(c.openReviewCount ?? 1) === 1 ? 'item' : 'items'} need your
+                review →
               </button>
             ) : c.status === 'watching' ? (
               <span className="wl-foot-note">

@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ao.agents import pipeline_state
@@ -246,6 +246,13 @@ async def serialize_company(
             for ix in ins_rows
         ]
 
+    open_review_count = (await session.execute(
+        select(func.count(m.ReviewItem.id)).where(
+            m.ReviewItem.company_id == c.id,
+            m.ReviewItem.resolved_at.is_(None),
+        )
+    )).scalar_one()
+
     return s.Company(
         ticker=c.ticker, name=c.name, sector=c.sector,
         price=price, dayChange=day_change, currency=c.currency,
@@ -262,6 +269,7 @@ async def serialize_company(
         nextWindow=nextWindow, history=history,
         portfolio=portfolio, narrative=narrative,
         confidence=confidence,
+        openReviewCount=int(open_review_count or 0),
         news=news, insider=insider,
         archivedAt=c.archived_at,
         irUrl=c.ir_url,

@@ -252,6 +252,9 @@ class Company(WireBase):
     # Overall financial-confidence score (replaces the per-metric high/med/low
     # as the headline). Null until the first assessment has been computed.
     confidence: Confidence | None = None
+    # Number of unresolved ReviewItem rows for this company. Drives the
+    # "N items need your review" footer button on the watchlist card.
+    openReviewCount: int = 0
     # Only set on GET /companies/{ticker}; list endpoint omits these
     news: list[NewsItem] | None = None
     insider: list[InsiderTx] | None = None

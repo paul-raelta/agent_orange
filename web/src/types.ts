@@ -218,6 +218,9 @@ export type Company = {
   /* Overall financial-confidence score — the headline metric. Null until the
      first assessment has been computed for this company. */
   confidence?: Confidence | null
+  /* Open (unresolved) ReviewItem count. Drives the watchlist "N items need
+     your review" footer. Zero when nothing is queued. */
+  openReviewCount?: number
   /* Populated on the deep-dive (GET /companies/:ticker); omitted by the list endpoint. */
   news?: NewsItem[] | null
   insider?: InsiderTx[] | null
