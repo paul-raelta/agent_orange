@@ -79,16 +79,21 @@ async def extract_filing(
         model = await model_for(session, user_id, "extraction")
         payload = _build_pages_payload(pages)
 
-        result: dict[str, Any] = await anthropic_client.complete(
-            model=model,
-            system=prompts.EXTRACTION_SYSTEM,
-            messages=[{
-                "role": "user",
-                "content": f"EARNINGS DOCUMENT (page-tagged):\n\n{payload}",
-            }],
-            tools=[prompts.EXTRACTION_TOOL],
-            max_tokens=4096,
-        )
+        try:
+            result: dict[str, Any] = await anthropic_client.complete(
+                model=model,
+                system=prompts.EXTRACTION_SYSTEM,
+                messages=[{
+                    "role": "user",
+                    "content": f"EARNINGS DOCUMENT (page-tagged):\n\n{payload}",
+                }],
+                tools=[prompts.EXTRACTION_TOOL],
+                max_tokens=4096,
+            )
+        except Exception as exc:  # noqa: BLE001
+            rec.set(level="error", model=model,
+                    message=f"Extraction LLM call failed: {exc.__class__.__name__}: {exc}")
+            return []
 
         rec.set(
             level="ok",

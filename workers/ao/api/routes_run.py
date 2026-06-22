@@ -9,6 +9,7 @@ Replaced by the real pipeline once agents/pipeline.py lands.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -25,6 +26,12 @@ from ao.db.engine import get_sessionmaker
 from ao.logging import get_logger
 
 log = get_logger(__name__)
+
+# Max tickers processed concurrently inside _bg_run_all. Each ticker fans into
+# ~4 sequential Opus calls (extract → validate → narrative → confidence) plus a
+# 60-page input payload, so the bottleneck is Anthropic TPM, not local CPU. 3
+# is a safe default for Tier-1 orgs; bump to ~5 on Tier-2+.
+PIPELINE_CONCURRENCY = 3
 
 
 async def _bg_run(user_id: str, ticker: str) -> None:
@@ -79,12 +86,18 @@ async def _bg_run_all(user_id: str) -> None:
             log.error("bg_run_all.side_refresh_failed", step=label, error=str(exc))
 
     # Per-company pipeline (monitor → extract → validate → narrative →
-    # confidence → notify).
-    for (ticker,) in rows:
-        try:
-            await _bg_run(user_id, ticker)
-        except Exception as exc:  # noqa: BLE001
-            log.error("bg_run_all.company_failed", ticker=ticker, error=str(exc))
+    # confidence → notify). Tickers are independent — run them in parallel,
+    # bounded by a semaphore to stay polite to the Anthropic rate limits.
+    sem = asyncio.Semaphore(PIPELINE_CONCURRENCY)
+
+    async def _gated(ticker: str) -> None:
+        async with sem:
+            try:
+                await _bg_run(user_id, ticker)
+            except Exception as exc:  # noqa: BLE001
+                log.error("bg_run_all.company_failed", ticker=ticker, error=str(exc))
+
+    await asyncio.gather(*(_gated(t) for (t,) in rows))
 
     # Window recompute last — reflects newly discovered filings.
     try:

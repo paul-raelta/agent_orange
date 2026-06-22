@@ -301,14 +301,19 @@ async def assess_confidence(
             return None
 
         model = await model_for(session, user_id, "confidence")
-        result: dict[str, Any] = await anthropic_client.complete(
-            model=model,
-            system=prompts.CONFIDENCE_SYSTEM,
-            messages=[{"role": "user", "content": json.dumps(inputs)}],
-            tools=[prompts.CONFIDENCE_TOOL],
-            tool_choice={"type": "tool", "name": "record_confidence"},
-            max_tokens=MAX_TOKENS,
-        )
+        try:
+            result: dict[str, Any] = await anthropic_client.complete(
+                model=model,
+                system=prompts.CONFIDENCE_SYSTEM,
+                messages=[{"role": "user", "content": json.dumps(inputs)}],
+                tools=[prompts.CONFIDENCE_TOOL],
+                tool_choice={"type": "tool", "name": "record_confidence"},
+                max_tokens=MAX_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001
+            rec.set(level="error", model=model,
+                    message=f"Confidence LLM call failed: {exc.__class__.__name__}: {exc}")
+            return None
 
         rec.set(
             model=model,

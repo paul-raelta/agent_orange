@@ -76,14 +76,19 @@ async def validate_metrics(
             for e in extracted
         ]
 
-        result: dict[str, Any] = await anthropic_client.complete(
-            model=model,
-            system=system_prompt,
-            messages=[{"role": "user", "content": str(payload)}],
-            tools=[prompts.VALIDATION_TOOL],
-            tool_choice={"type": "tool", "name": "record_validation"},
-            max_tokens=2048,
-        )
+        try:
+            result: dict[str, Any] = await anthropic_client.complete(
+                model=model,
+                system=system_prompt,
+                messages=[{"role": "user", "content": str(payload)}],
+                tools=[prompts.VALIDATION_TOOL],
+                tool_choice={"type": "tool", "name": "record_validation"},
+                max_tokens=2048,
+            )
+        except Exception as exc:  # noqa: BLE001
+            rec.set(level="error", model=model,
+                    message=f"Validation LLM call failed: {exc.__class__.__name__}: {exc}")
+            return None
 
         rec.set(
             model=model,

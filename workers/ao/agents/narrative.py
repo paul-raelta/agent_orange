@@ -37,13 +37,18 @@ async def write_narrative(
         if prior_y:
             ctx["prior_year"] = prior_y
 
-        result = await anthropic_client.complete(
-            model=model,
-            system=prompts.NARRATIVE_SYSTEM,
-            messages=[{"role": "user", "content": f"Quarter context: {ctx}"}],
-            max_tokens=MAX_TOKENS,
-            temperature=0.0,
-        )
+        try:
+            result = await anthropic_client.complete(
+                model=model,
+                system=prompts.NARRATIVE_SYSTEM,
+                messages=[{"role": "user", "content": f"Quarter context: {ctx}"}],
+                max_tokens=MAX_TOKENS,
+                temperature=0.0,
+            )
+        except Exception as exc:  # noqa: BLE001
+            rec.set(level="error", model=model,
+                    message=f"Narrative LLM call failed: {exc.__class__.__name__}: {exc}")
+            return None
 
         text = ""
         for block in result["raw"].content:
