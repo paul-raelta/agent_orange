@@ -2,13 +2,14 @@
 
 Cleared:
   - filings, results, metrics, provenance, agent_runs
-  - prices, news, insider_tx, usage_daily
+  - prices, news, insider_tx, usage_daily, confidence_assessments
   - review_items, review_candidates
   - companies (and their per-company sources + per-company source overrides)
 
 Kept:
   - users, data_sources (per-user registry of feeds), routing_rules,
-    providers, notification_prefs, settings, source_suggestions
+    providers, notification_prefs, settings, feature_flags,
+    validation_thresholds, source_suggestions
 """
 from __future__ import annotations
 
@@ -51,6 +52,7 @@ async def wipe() -> None:
             m.News,
             m.InsiderTx,
             m.UsageDaily,
+            m.ConfidenceAssessment,
             m.CompanySourceOverride,
             m.Source,
             m.Company,
