@@ -40,8 +40,9 @@ Open <http://localhost:5173>. The UI hits the API on :8000.
 | Extraction (Opus + tool use) | 🟡 needs `ANTHROPIC_API_KEY` | Otherwise gracefully no-ops |
 | Validation (Opus structured) | 🟡 needs `ANTHROPIC_API_KEY` | Otherwise gracefully no-ops |
 | Narrative (Opus 2-3 sentences) | 🟡 needs `ANTHROPIC_API_KEY` | Otherwise gracefully no-ops |
+| Confidence (Opus structured) | 🟡 needs `ANTHROPIC_API_KEY` | Company-level 0–100 score; runs after narrative + daily. See [`../CONFIDENCE.md`](../CONFIDENCE.md) |
 | Notifications dispatcher | ✅ live | UI (SSE) + email + SMS, per-event opt-in |
-| Scheduler (APScheduler) | ✅ live | poll/prices/news/windows jobs; skips archived |
+| Scheduler (APScheduler) | ✅ live | poll/prices/news/windows/backfill/confidence jobs; skips archived |
 | Data Sources registry | ✅ live | Built-ins + user-added + suggestions; SSRF-guarded |
 | Per-company source overrides | ✅ live | Sparse overrides table; archive/restore/hard-delete |
 | Schema self-heal | ✅ live | `ensure_schema()` at API startup adds new columns idempotently |

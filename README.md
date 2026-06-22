@@ -48,6 +48,11 @@ After the agents run:
    to the filing, live quote, 30-day news, insider tx
 3. **AI narrative card** — 2–3 sentence "what's worth knowing" (≤200 tokens,
    gated on `ANTHROPIC_API_KEY`)
+4. **Financial-confidence %** — a company-level, colour-coded 0–100 score (the
+   headline that replaced the per-metric high/med/low badge). An LLM blends
+   inter-document agreement, cross-source consistency, insider activity + news,
+   and share-price-trend alignment into one number with a transparent
+   factor-by-factor breakdown. See [`CONFIDENCE.md`](CONFIDENCE.md)
 4. **Review queue** — anything that doesn't reconcile. Canonical case:
    SanDisk GAAP diluted EPS $0.79 on the schedule vs adjusted $0.82 in the
    press release → routed to REVIEW instead of silently picking one
@@ -135,12 +140,14 @@ Python 3.12 + FastAPI + SQLite + SQLAlchemy 2.x async + APScheduler.
   (quotes / news / Form 4 insider tx), Anthropic SDK (Opus + tool use for
   extraction, validation, narrative), Gmail SMTP, Twilio SMS
 - **Agent pipeline**: monitor → download → extract → validate → narrative →
-  notify. Idempotent per `(filing_id, stage)`. LLM stages gracefully no-op
-  when `ANTHROPIC_API_KEY` isn't set
+  confidence → notify. Idempotent per `(filing_id, stage)`. LLM stages
+  gracefully no-op when `ANTHROPIC_API_KEY` isn't set
 - **Scheduler**: APScheduler running poll_company (per ticker, daily 06:00
   UTC), refresh_prices (5 min during US market hours), refresh_news_insider
-  (30 min), recompute_windows (daily). Portable — same code runs locally
-  now and on Cloud Run later via `AO_SCHEDULER_MODE=external`
+  (30 min), recompute_windows (daily 00:05), backfill_prices (daily 00:10 —
+  historical candles for the confidence trend), recompute_confidence (daily
+  00:15, 20h idempotency guard). Portable — same code runs locally now and on
+  Cloud Run later via `AO_SCHEDULER_MODE=external`
 - **Notifications**: UI (SSE), email (Gmail SMTP), SMS (Twilio). Per-event
   opt-in via the Settings → NOTIFICATIONS panel
 
