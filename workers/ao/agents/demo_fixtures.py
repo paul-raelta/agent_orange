@@ -18,6 +18,7 @@ rest are gitignored — they're local artefacts of whatever you ran.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tempfile
@@ -32,6 +33,25 @@ log = get_logger(__name__)
 Stage = Literal["filing", "extraction", "validation", "narrative", "confidence"]
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures"
+
+# Small synthetic latency per stage in demo mode, so the watchlist doesn't
+# update before the examiner overlay finishes its first chapter and so
+# /activity rows don't all read 0ms. Total per ticker ≈ 2.2s; with the
+# pipeline running 3 tickers concurrently, full RUN ALL still completes in
+# ~3s wall-clock.
+DEMO_DELAYS_S: dict[str, float] = {
+    "extraction": 1.0,
+    "validation": 0.4,
+    "narrative": 0.4,
+    "confidence": 0.4,
+}
+
+
+async def throttle(stage: str) -> None:
+    """Sleep just long enough to make a demo-mode replay feel like real work."""
+    delay = DEMO_DELAYS_S.get(stage, 0.0)
+    if delay > 0:
+        await asyncio.sleep(delay)
 
 
 # ---------------------------------------------------------------------------

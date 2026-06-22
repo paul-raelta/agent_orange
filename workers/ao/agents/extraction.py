@@ -79,6 +79,7 @@ async def extract_filing(
         if demo_replay:
             payload = demo_fixtures.load(ticker) or {}
             replay = demo_fixtures.to_extracted_metrics(payload.get("extraction"))
+            await demo_fixtures.throttle("extraction")
             rec.set(
                 level="ok", model="demo-fixture", cost_usd=0.0,
                 input_tokens=0, output_tokens=0,

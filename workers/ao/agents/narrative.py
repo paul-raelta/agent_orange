@@ -30,6 +30,7 @@ async def write_narrative(
         if demo_replay:
             payload = demo_fixtures.load(ticker) or {}
             text = demo_fixtures.to_narrative(payload.get("narrative"))
+            await demo_fixtures.throttle("narrative")
             rec.set(
                 level="ok" if text else "info",
                 model="demo-fixture", cost_usd=0.0,

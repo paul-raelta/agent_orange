@@ -60,6 +60,7 @@ async def validate_metrics(
                 rec.set(level="info",
                         message="demo_mode: no validation fixture; skipped.")
                 return None
+            await demo_fixtures.throttle("validation")
             rec.set(
                 level="ok" if replay.passed else "warn",
                 model="demo-fixture", cost_usd=0.0,

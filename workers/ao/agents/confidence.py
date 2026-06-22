@@ -300,6 +300,7 @@ async def assess_confidence(
                 return None
             inputs = await _assemble_inputs(session, company_id)
             await _persist(session, company_id, replay, inputs, "demo-fixture")
+            await demo_fixtures.throttle("confidence")
             rec.set(
                 level="ok", model="demo-fixture", cost_usd=0.0,
                 input_tokens=0, output_tokens=0,
