@@ -65,11 +65,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str = Field("", alias="ANTHROPIC_API_KEY")
     # Default model per stage. Routed at runtime via the routing_rules table.
     # These are the "first time" seed values for a new user.
-    default_model_discovery: str = "claude-sonnet-4-5"
+    default_model_discovery: str = "claude-sonnet-4-6"
     default_model_monitor: str = "claude-haiku-4-5-20251001"
     default_model_extraction: str = "claude-opus-4-7"
-    default_model_validation: str = "claude-opus-4-7"
-    default_model_narrative: str = "claude-opus-4-7"
+    default_model_validation: str = "claude-sonnet-4-6"
+    default_model_narrative: str = "claude-sonnet-4-6"
     # Help Assistant — Q&A about the app itself. Cheap & fast; the KB already
     # grounds it, so Haiku is plenty.
     default_model_help: str = "claude-haiku-4-5-20251001"

@@ -192,6 +192,12 @@ function CompanyCard({
   const L = c.latest
   const beat = flags.consensus ? cardBeatSummary(L.metrics) : null
   const supported = isSupported(c.ticker)
+  // While status is `watching` and no metrics have been extracted yet, every
+  // numeric on the card (price, day-change, sparkline, position value) is a
+  // static seed value from sp500_seed.py — not real data. Hide them and
+  // render an explicit "waiting" panel until the pipeline writes real rows.
+  const awaitingAgents =
+    supported && c.status === 'watching' && L.metrics.length === 0
   return (
     <article className={'wl-card status-' + c.status} onClick={onOpen}>
       <div className="wl-card-top">
@@ -215,12 +221,14 @@ function CompanyCard({
         </div>
       </div>
 
-      <div className="wl-pricerow">
-        <Price price={c.price} change={c.dayChange} />
-        <Spark data={c.sparkEps} color="var(--accent)" />
-      </div>
+      {!awaitingAgents && (
+        <div className="wl-pricerow">
+          <Price price={c.price} change={c.dayChange} />
+          <Spark data={c.sparkEps} color="var(--accent)" />
+        </div>
+      )}
 
-      {c.portfolio.shares > 0 && (
+      {!awaitingAgents && c.portfolio.shares > 0 && (
         <div className="wl-position">
           <span className="lbl">POSITION</span>
           <span className="wl-position-val">{fmtMoney(c.portfolio.value)}</span>
@@ -236,7 +244,18 @@ function CompanyCard({
         </div>
       )}
 
-      {supported ? (
+      {awaitingAgents ? (
+        <div className="wl-awaiting">
+          <span className="wl-awaiting-dot" aria-hidden />
+          <div className="wl-awaiting-copy">
+            <div className="wl-awaiting-title">Waiting for agents</div>
+            <div className="wl-awaiting-sub">
+              Click RUN ALL AGENTS to fetch the latest filing, extract the
+              headline figures, and populate price + reported metrics.
+            </div>
+          </div>
+        </div>
+      ) : supported ? (
         <>
           <div className="wl-period">
             <span className="wl-period-lab">

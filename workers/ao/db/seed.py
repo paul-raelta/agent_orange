@@ -473,22 +473,29 @@ def _seed_data_sources(session, user: m.User) -> None:
         ))
 
 
-def _seed_routing_providers(session, user: m.User) -> None:
-    settings = get_settings()
-    session.add_all([
-        m.RoutingRule(user_id=user.id, task="Source discovery",
+def default_routing_rules(user_id: str) -> list[m.RoutingRule]:
+    """Canonical per-stage routing for a user. Single source of truth — used
+    by both the first-time seed and Settings → RESET so the two paths can't
+    drift apart."""
+    return [
+        m.RoutingRule(user_id=user_id, task="Source discovery",
                       desc="Find where a company's results live (IR site, EDGAR).",
                       model="Claude Sonnet 4"),
-        m.RoutingRule(user_id=user.id, task="Monitoring poll",
+        m.RoutingRule(user_id=user_id, task="Monitoring poll",
                       desc="Cheap recurring check for a new filing.",
                       model="Claude Haiku 4"),
-        m.RoutingRule(user_id=user.id, task="Extraction",
+        m.RoutingRule(user_id=user_id, task="Extraction",
                       desc="Pull figures from filings & PDFs.",
                       model="Claude Opus 4"),
-        m.RoutingRule(user_id=user.id, task="Validation",
+        m.RoutingRule(user_id=user_id, task="Validation",
                       desc="Cross-reference numbers across the document.",
-                      model="Claude Opus 4"),
-    ])
+                      model="Claude Sonnet 4"),
+    ]
+
+
+def _seed_routing_providers(session, user: m.User) -> None:
+    settings = get_settings()
+    session.add_all(default_routing_rules(user.id))
     session.add_all([
         m.Provider(user_id=user.id, provider_id="anthropic",
                    name="Anthropic — Claude", status="active",

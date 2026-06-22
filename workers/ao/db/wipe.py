@@ -6,17 +6,22 @@ Cleared:
   - review_items, review_candidates
   - companies (and their per-company sources + per-company source overrides)
 
+Reset to defaults (deleted then reseeded from seed.default_routing_rules):
+  - routing_rules — so Settings → RESET reverts per-stage model picks to the
+    canonical demo combo even if the user changed them via Settings → Routing.
+
 Kept:
-  - users, data_sources (per-user registry of feeds), routing_rules,
-    providers, notification_prefs, settings, feature_flags,
-    validation_thresholds, source_suggestions
+  - users, data_sources (per-user registry of feeds), providers,
+    notification_prefs, settings, feature_flags, validation_thresholds,
+    source_suggestions
 """
 from __future__ import annotations
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from ao.db import models as m
 from ao.db.engine import create_all, get_engine, get_sessionmaker
+from ao.db.seed import default_routing_rules
 from ao.logging import get_logger, setup_logging
 
 log = get_logger(__name__)
@@ -58,6 +63,13 @@ async def wipe() -> None:
             m.Company,
         ):
             await session.execute(delete(model))
+
+        # Reset routing rules to their canonical defaults — one row per
+        # (user, task). Wipe, then reseed from the single source of truth.
+        await session.execute(delete(m.RoutingRule))
+        user_ids = (await session.execute(select(m.User.id))).scalars().all()
+        for uid in user_ids:
+            session.add_all(default_routing_rules(uid))
 
         await session.commit()
     await get_engine().dispose()
