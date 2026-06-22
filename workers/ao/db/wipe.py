@@ -22,19 +22,30 @@ log = get_logger(__name__)
 
 
 async def wipe() -> None:
-    """Clear fetched data and tracked companies."""
+    """Clear fetched data and tracked companies.
+
+    Order matters — child tables must be deleted before their parents.
+    Postgres enforces FK constraints; SQLite (local) does not by default,
+    so a wrong order silently passes locally but raises on Railway and
+    rolls the whole transaction back, leaving companies in place.
+
+    FK chain (children point up):
+      Provenance → Metric → Result → Filing → Company
+      ReviewCandidate → ReviewItem → Result/Company
+      AgentRun/Price/News/InsiderTx/CompanySourceOverride/Source → Company
+      UsageDaily → User (independent of Company)
+    """
     setup_logging("INFO")
     await create_all()
     Session = get_sessionmaker()
     async with Session() as session:
-        # Order matters — delete child tables before parents.
         for model in (
             m.Provenance,
             m.Metric,
-            m.Result,
-            m.Filing,
             m.ReviewCandidate,
             m.ReviewItem,
+            m.Result,
+            m.Filing,
             m.AgentRun,
             m.Price,
             m.News,

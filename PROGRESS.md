@@ -1,5 +1,43 @@
 # PROGRESS — Agent Orange
 
+## Increment — wipe order fix (Postgres FK enforcement)
+
+**Goal:** Settings → RESET TO FIRST-TIME STATE clears tracked companies on
+Railway (Postgres) as it already does locally (SQLite).
+
+**Root cause** — `workers/ao/db/wipe.py` deleted `Result` before
+`ReviewItem`, but `ReviewItem.result_id → results.id` is a FK. SQLite by
+default does not enforce foreign keys (`PRAGMA foreign_keys=OFF`), so the
+unscoped `DELETE FROM results` succeeded locally. Postgres enforces FKs
+strictly — the same DELETE raised `IntegrityError: FOREIGN KEY constraint
+failed`, the whole transaction rolled back, and Companies + everything
+else stayed put on the deployed app. The cascade in
+`DELETE /companies/{ticker}` (routes_companies.py:374-405) already gets
+this right; wipe.py drifted from that order.
+
+**Fix** — reorder deletes in `wipe.py` so children always precede parents:
+Provenance → Metric → **ReviewCandidate → ReviewItem** → Result → Filing
+→ AgentRun → Price → News → InsiderTx → UsageDaily →
+CompanySourceOverride → Source → Company.
+
+**Verification** — file-backed SQLite with `PRAGMA foreign_keys=ON` set on
+connect (Postgres-style FK enforcement). Seeded a Company, Filing,
+Result, Metric, Provenance, ReviewItem (with non-null `result_id`),
+ReviewCandidate, AgentRun, Price, Source.
+- Old order → `IntegrityError: FOREIGN KEY constraint failed` on
+  `DELETE FROM results`, transaction rolled back.
+- New order → `wipe.done`; every table count is 0 after.
+
+**Files touched**
+- `workers/ao/db/wipe.py` — deletion order.
+
+**Next step**
+Push to main; Railway auto-deploys. Verify on the deployed app: add a few
+tickers, click Settings → RESET TO FIRST-TIME STATE → confirm. Watchlist
+should empty out and `/companies` should show no rows.
+
+---
+
 ## Goal
 Recreate the `design/` prototype as a real production app — UI + backend —
 and ship something the user can run locally today, with seams in place to
