@@ -38,10 +38,12 @@ async def compute_next_window(
         .where(m.Filing.company_id == company.id)
         .order_by(desc(m.Filing.reported_on)).limit(8)
     )).scalars().all()
-    if len(rows) < 2:
+    if not rows:
         return None
 
     # Parse period_end → reported_on lag for each filing where both are dates.
+    # A single filing is enough: pstdev collapses to 0 and the min ±5/7d clamps
+    # below provide the window width until more history accumulates.
     lags = []
     period_ends = []
     for r in rows:

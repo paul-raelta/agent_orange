@@ -22,6 +22,7 @@ from ao.integrations import edgar_client
 from ao.logging import get_logger
 from ao.notify import dispatcher
 from ao.notify.events import Event
+from ao.scheduler.cadence import compute_next_window
 
 log = get_logger(__name__)
 
@@ -216,6 +217,15 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
                     ))
 
     await session.commit()
+
+    # Refresh the next predicted window now that a new filing exists, so the
+    # timeline picks it up without waiting for the nightly recompute.
+    window = await compute_next_window(session, company)
+    if window is not None:
+        company.next_window_from = window.from_.isoformat()
+        company.next_window_to = window.to.isoformat()
+        company.next_window_label = window.label
+        await session.commit()
 
     # --- 6. Narrative -------------------------------------------------
     if verdict and verdict.passed:

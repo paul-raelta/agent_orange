@@ -1,5 +1,144 @@
 # PROGRESS — Agent Orange
 
+## Increment — predicted filing window now shows after the first filing
+
+**Goal:** the FILING TIMELINE screen draws a future "predicted window" bar
+for freshly-added companies as soon as one 10-Q has been recorded, instead
+of waiting for ≥2 filings to accumulate.
+
+**Root cause** — `compute_next_window` (`workers/ao/scheduler/cadence.py`)
+bailed with `None` when `len(rows) < 2`, and the pipeline never re-computed
+the window after writing a new filing. So a ticker added via Add Companies
+sat with one filing and a null `next_window_*` until the nightly recompute,
+and even then got skipped.
+
+**What changed**
+- `workers/ao/scheduler/cadence.py` — threshold lowered from `< 2` to
+  `not rows`. With a single filing, `statistics.pstdev` collapses to 0 and
+  the existing `max(stdev, 5d)` / `max(stdev, 7d)` clamps supply the window
+  width (≈ ±5–7 days around `last_period_end + cadence_delta + mean_lag`).
+- `workers/ao/agents/pipeline.py` — after the Result is committed, call
+  `compute_next_window(session, company)` and persist `next_window_from /
+  next_window_to / next_window_label` in the same session. Timeline picks
+  up the new window without waiting for the 00:05 cron.
+- One-shot: ran `recompute_windows()` against the local SQLite DB to
+  backfill the rows that were added before this fix. COST → 2026-08-27 to
+  2026-09-08, NVDA → 2026-08-13 to 2026-08-25.
+
+**Known follow-ups (not addressed here)**
+- `Timeline.tsx:17-19` hardcodes `MONTHS = [APR..DEC]` and `TODAY = 3.3`.
+  The "NOW" pin is glued to late July and anything outside Apr–Dec 2026
+  silently disappears (`monthFraction` returns null). Worth turning into
+  a rolling 9-month axis anchored on real today.
+- `monitoring.py:137` falls back to `filing_date` when `period_of_report`
+  is missing, so `period_end == reported_on` for the pipeline-written
+  COST/NVDA rows. That makes the implied reporting lag 0d and skews the
+  prediction by ~1 month (next-period-end is dated off `reported_on`
+  rather than the true quarter end). Investigate why EDGAR's
+  `periodOfReport` field isn't being captured.
+
+**Files touched**
+- `workers/ao/scheduler/cadence.py`
+- `workers/ao/agents/pipeline.py`
+
+**Next step**
+Visual QA: open `/timeline`, confirm COST and NVDA now each show a
+predicted-window bar in Aug/Sep '26. Add a new ticker via Add Companies,
+RUN ALL → confirm the timeline gets a bar for it on the next refresh.
+
+---
+
+## Increment — pipeline speedups + silent-failure fix + demo model defaults
+
+**Goal:** RUN ALL AGENTS finishes faster, Anthropic-side failures surface in
+`/activity` instead of disappearing into uvicorn stdout, and the per-stage
+model routing baked into the repo matches the demo recommendation.
+
+**What changed**
+- `workers/ao/api/routes_run.py` — `_bg_run_all` now fans out tickers via
+  `asyncio.gather` gated by `PIPELINE_CONCURRENCY = 3` (was a sequential
+  `for` loop). Each ticker still runs its stages serially inside `_bg_run`
+  and opens its own DB session, so no shared-state risks. Per-ticker errors
+  stay isolated (still logged as `bg_run_all.company_failed`).
+- `workers/ao/agents/extraction.py`, `validation.py`, `narrative.py`,
+  `confidence.py` — each wraps `anthropic_client.complete(...)` in a
+  `try / except Exception` that calls
+  `rec.set(level="error", message=f"<Stage> LLM call failed: {cls}: {exc}")`
+  and returns the stage's "no data" value. Pipeline short-circuits cleanly
+  via existing `is None` / empty checks; the real error class + message
+  (credit balance, rate limit, auth, network) lands in `agent_runs` and
+  surfaces on the Activity page.
+- `workers/ao/config.py` — defaults updated to the demo recommendation:
+  - discovery → `claude-sonnet-4-6` (was `claude-sonnet-4-5`)
+  - monitor → `claude-haiku-4-5-20251001` (unchanged)
+  - extraction → `claude-opus-4-7` (unchanged — accuracy-critical)
+  - validation → `claude-sonnet-4-6` (was `claude-opus-4-7`)
+  - narrative → `claude-sonnet-4-6` (was `claude-opus-4-7`)
+- `workers/ao/db/seed.py` — `_seed_routing_providers` Validation row flipped
+  from `model="Claude Opus 4"` to `model="Claude Sonnet 4"` so new users get
+  the Sonnet routing baked in.
+
+**Decisions baked in**
+- Extraction stays on Opus 4.7 — the 60-page filing → tabular GAAP/non-GAAP
+  extraction is the highest-leverage accuracy call. Haiku misreads
+  multi-column income statements; the SNDK demo conflict is wrecked if EPS
+  is wrong.
+- Validation, narrative, confidence drop to Sonnet 4.6. Inputs are small
+  and the reasoning is well-scoped; significantly faster than Opus,
+  reliably triggers the SNDK conflict path. Confidence inherits validation
+  per `registry.py:61`; narrative reads `default_model_narrative` directly.
+- `PIPELINE_CONCURRENCY = 3` is a conservative Tier-1 default. Each ticker
+  fans into 4 sequential LLM calls (extract → validate → narrative →
+  confidence) on a 60-page payload, so Anthropic TPM is the real ceiling.
+  Bump to ~5 on Tier-2+.
+- Silent-failure pattern: catch + log + return None (not re-raise). The
+  uncaught path was bubbling to `_bg_run`'s `bg_run.failed` structured-log
+  line only — never `agent_runs`. Re-raising worked but added noise; the
+  return-None path is cleaner and the agent_run row carries the full info.
+
+**Verification done**
+- `python -c "from ao.agents import extraction, validation, narrative,
+  confidence"` — imports green.
+- `python -c "from ao.api.routes_run import _bg_run_all,
+  PIPELINE_CONCURRENCY"` — green; `PIPELINE_CONCURRENCY = 3`.
+- `python -c "from ao.config import get_settings; print(...)"` — all 5
+  per-stage defaults match the recommended demo combo.
+
+**Files touched**
+- `workers/ao/api/routes_run.py`
+- `workers/ao/agents/extraction.py`
+- `workers/ao/agents/validation.py`
+- `workers/ao/agents/narrative.py`
+- `workers/ao/agents/confidence.py`
+- `workers/ao/config.py`
+- `workers/ao/db/seed.py`
+
+**Follow-up — Settings → RESET also resets routing_rules**
+- `workers/ao/db/seed.py` — routing-rule defaults extracted into
+  `default_routing_rules(user_id) -> list[RoutingRule]` (module-level
+  helper). `_seed_routing_providers` rewritten to call it. Single source of
+  truth for both first-time seed and reset.
+- `workers/ao/db/wipe.py` — after the existing delete loop, `delete(RoutingRule)`
+  then SELECT all `User.id` and re-insert `default_routing_rules(uid)` per
+  user. Docstring updated: routing_rules moved from "Kept" into a new
+  "Reset to defaults" section. Imports `default_routing_rules` and `select`.
+- Settings → RESET TO FIRST-TIME STATE now genuinely reverts per-stage model
+  picks back to the demo combo even if the user changed them via Settings →
+  Routing. Verified end-to-end: `wipe()` against the live SQLite DB leaves
+  the canonical 4 rows in place (Discovery=Sonnet, Monitor=Haiku,
+  Extraction=Opus, Validation=Sonnet).
+
+**Next step**
+- Visual QA: add 3 tickers → RUN ALL → confirm `/activity` shows extraction
+  rows with token + cost numbers, that wall-clock for 5 tickers is roughly
+  half of the prior serial run, and that any `RateLimitError` /
+  `BadRequestError` shows up as an `error` row with the exception class
+  name in the message.
+- Visual QA the routing reset: change Validation to Opus via Settings →
+  Routing, then RESET, then confirm Validation is back on Sonnet.
+
+---
+
 ## Increment — wipe order fix (Postgres FK enforcement)
 
 **Goal:** Settings → RESET TO FIRST-TIME STATE clears tracked companies on
