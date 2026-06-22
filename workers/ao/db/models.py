@@ -421,6 +421,7 @@ class FeatureFlag(Base):
     consensus: Mapped[bool] = mapped_column(Boolean, default=True)
     conflict: Mapped[bool] = mapped_column(Boolean, default=True)
     guidance: Mapped[bool] = mapped_column(Boolean, default=True)
+    demo_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ValidationThreshold(Base):

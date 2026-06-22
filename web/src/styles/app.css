@@ -2691,6 +2691,7 @@ select.inp {
 .ac-cap{font-size:9.5px;color:var(--text-3);letter-spacing:.03em}
 .ac-earn{font-size:9.5px;color:var(--amber);letter-spacing:.03em;display:inline-flex;align-items:center;gap:4px}
 .ac-trackchip{font-size:8.5px;letter-spacing:.1em;color:var(--green);border:1px solid rgba(78,199,122,.35);background:rgba(78,199,122,.1);border-radius:4px;padding:2px 6px;white-space:nowrap}
+.ac-demochip{font-size:7.5px;letter-spacing:.12em;color:var(--amber);border:1px solid rgba(247,180,72,.35);background:rgba(247,180,72,.08);border-radius:3px;padding:1px 5px;white-space:nowrap;margin-left:6px;vertical-align:middle}
 
 /* table view */
 .ac-tblwrap{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--panel)}

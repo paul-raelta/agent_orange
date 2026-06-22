@@ -83,6 +83,8 @@ _COLUMN_MIGRATIONS: list[tuple[str, str, dict[str, str]]] = [
      {"sqlite": "REAL", "postgresql": "DOUBLE PRECISION"}),
     ("results", "eps_sign_flip",
      {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
+    ("feature_flags", "demo_mode",
+     {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
 ]
 
 

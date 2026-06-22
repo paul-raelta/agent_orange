@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ao.agents import demo_fixtures
 from ao.api import schemas as s
 from ao.api.deps import current_user_id, get_db
 from ao.api.serializers import _latest_price
@@ -39,6 +40,9 @@ async def get_universe(
         )
     )).all()
     tracked = {t: cid for (t, cid) in rows}
+    # One filesystem scan, not 162 stats. Universe is read-mostly, the
+    # fixtures directory rarely changes, and listing it once is cheap.
+    demo_ready = set(demo_fixtures.list_tickers())
 
     out: list[s.UniverseCompany] = []
     for seed in SP500_SEED:
@@ -58,5 +62,6 @@ async def get_universe(
             earn=seed["earn"], earnDays=int(seed["earnDays"]),
             tracked=cid is not None,
             logoUrl=LOGO_BY_TICKER.get(ticker),
+            demoReady=ticker.upper() in demo_ready,
         ))
     return out

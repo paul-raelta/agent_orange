@@ -24,7 +24,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ao.agents import prompts
+from ao.agents import demo_fixtures, prompts
 from ao.agents.registry import model_for
 from ao.agents.runlog import run_log
 from ao.db import models as m
@@ -285,10 +285,31 @@ async def _assemble_inputs(session: AsyncSession, company_id: str) -> dict:
 async def assess_confidence(
     session: AsyncSession, user_id: str, *,
     company_id: str, ticker: str,
+    demo_replay: bool = False,
+    demo_save: bool = False,
 ) -> ConfidenceOutput | None:
     """Compute + persist the overall confidence assessment for one company."""
     async with run_log(session, user_id, ticker, stage="confidence",
                        company_id=company_id) as rec:
+        if demo_replay:
+            payload = demo_fixtures.load(ticker) or {}
+            replay = demo_fixtures.to_confidence_output(payload.get("confidence"))
+            if replay is None:
+                rec.set(level="info",
+                        message="demo_mode: no confidence fixture; skipped.")
+                return None
+            inputs = await _assemble_inputs(session, company_id)
+            await _persist(session, company_id, replay, inputs, "demo-fixture")
+            rec.set(
+                level="ok", model="demo-fixture", cost_usd=0.0,
+                input_tokens=0, output_tokens=0,
+                message=(
+                    f"Replayed confidence {replay.overall_pct}% "
+                    f"({replay.band}) — {len(replay.factors)} factors."
+                ),
+            )
+            return replay
+
         if not anthropic_client.is_configured():
             rec.set(level="warn",
                     message="ANTHROPIC_API_KEY not set — confidence skipped.")
@@ -354,6 +375,8 @@ async def assess_confidence(
             level="ok",
             message=f"Confidence {out.overall_pct}% ({out.band}) — {len(out.factors)} factors.",
         )
+        if demo_save:
+            demo_fixtures.save(ticker, "confidence", out)
         return out
 
 

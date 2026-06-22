@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from ao.agents import prompts
+from ao.agents import demo_fixtures, prompts
 from ao.agents.extraction import ExtractedMetric
 from ao.agents.registry import model_for
 from ao.agents.runlog import run_log
@@ -48,9 +48,29 @@ async def validate_metrics(
     session, user_id: str, *,
     company_id: str, ticker: str,
     extracted: list[ExtractedMetric],
+    demo_replay: bool = False,
+    demo_save: bool = False,
 ) -> ValidationOutput | None:
     async with run_log(session, user_id, ticker, stage="validation",
                        company_id=company_id) as rec:
+        if demo_replay:
+            payload = demo_fixtures.load(ticker) or {}
+            replay = demo_fixtures.to_validation_output(payload.get("validation"))
+            if replay is None:
+                rec.set(level="info",
+                        message="demo_mode: no validation fixture; skipped.")
+                return None
+            rec.set(
+                level="ok" if replay.passed else "warn",
+                model="demo-fixture", cost_usd=0.0,
+                input_tokens=0, output_tokens=0,
+                message=(
+                    f"Replayed validation {'PASSED' if replay.passed else 'FAILED'}"
+                    f" — {len(replay.per_metric)} metrics."
+                ),
+            )
+            return replay
+
         if not anthropic_client.is_configured():
             rec.set(level="warn",
                     message="ANTHROPIC_API_KEY not set — validation skipped.")
@@ -122,6 +142,8 @@ async def validate_metrics(
                     level="ok" if out.passed else "warn",
                     message=f"Validation {'PASSED' if out.passed else 'FAILED'} — {len(per_metric)} metrics judged.",
                 )
+                if demo_save:
+                    demo_fixtures.save(ticker, "validation", out)
                 return out
 
         rec.set(level="error", message="Validation tool was not called.")

@@ -182,6 +182,7 @@ class FeatureFlags(WireBase):
     consensus: bool = True
     conflict: bool = True
     guidance: bool = True
+    demo_mode: bool = False
 
 
 class ValidationThresholds(WireBase):
@@ -517,6 +518,7 @@ class UniverseCompany(WireBase):
     earnDays: int
     tracked: bool
     logoUrl: str | None = None
+    demoReady: bool = False
 
 
 class BatchAddRequest(WireBase):

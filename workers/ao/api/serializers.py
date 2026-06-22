@@ -529,9 +529,14 @@ async def serialize_feature_flags(
 ) -> s.FeatureFlags:
     row = await session.get(m.FeatureFlag, user_id)
     if row is None:
-        return s.FeatureFlags(consensus=True, conflict=True, guidance=True)
+        return s.FeatureFlags(
+            consensus=True, conflict=True, guidance=True, demo_mode=False,
+        )
     return s.FeatureFlags(
-        consensus=row.consensus, conflict=row.conflict, guidance=row.guidance,
+        consensus=row.consensus,
+        conflict=row.conflict,
+        guidance=row.guidance,
+        demo_mode=bool(getattr(row, "demo_mode", False)),
     )
 
 

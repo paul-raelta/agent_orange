@@ -1,5 +1,129 @@
 # PROGRESS — Agent Orange
 
+## Increment — Demo mode (skip Opus, replay cached extractions)
+
+**Goal:** drive the app end-to-end with `$0` Anthropic spend by adding a Settings
+toggle that makes the pipeline replay the most recent real extraction for each
+ticker instead of calling Opus. Real runs always re-save the fixture; demo
+runs read it back.
+
+**Design**
+- New on-disk store: `workers/ao/fixtures/<TICKER>/fixture.json` — one file
+  per ticker, all four stages bundled (`filing / extraction / validation /
+  narrative / confidence`).
+- New `workers/ao/agents/demo_fixtures.py` with `has_fixture / load / save /
+  list_tickers` + per-stage Pydantic/dataclass rehydrators. Atomic writes via
+  `tempfile + os.replace`; best-effort (catches OSError, never raises).
+- `feature_flags.demo_mode: bool` added (default `False`). New idempotent
+  ALTER in `_COLUMN_MIGRATIONS` so existing DBs self-heal.
+- `pipeline.run_one` branches at the top: if `flags.demo_mode` and a fixture
+  exists, it skips monitor + download, resolves a `Filing` row (latest from
+  DB or synthesised from `fixture.filing`), and threads `demo_replay=True`
+  down. If demo mode is on but no fixture: clean skip into `agent_runs`,
+  no PDF parse, no Anthropic call. Real path threads `demo_save=True` so
+  each successful stage persists its fresh output.
+- All four LLM stages (`extraction / validation / narrative / confidence`)
+  gain `demo_replay` + `demo_save` kwargs. Replay records an `agent_runs`
+  row tagged `model="demo-fixture"`, `cost_usd=0`, no token counts.
+- `GET /universe` now emits `demoReady: bool` on each row, derived from a
+  single `demo_fixtures.list_tickers()` call (one fs scan, not 162 stats).
+  Settings → DEMO MODE panel and Add Companies use this to label
+  "DEMO READY" rows.
+
+**Bootstrap fixtures**
+- `workers/scripts/export_seed_fixtures.py` (new) writes NVDA / SNDK / MU
+  fixtures from constants derived 1:1 from the latest-quarter data in
+  `_seed_nvda / _seed_sndk / _seed_mu`. Ran once → produced:
+  `workers/ao/fixtures/{NVDA,SNDK,MU}/fixture.json`.
+- `.gitignore`: `workers/ao/fixtures/*` ignored with `!` exceptions for the
+  three bootstrap tickers — anything else (AAPL/MSFT/…) seeded by a real
+  run stays local by default.
+
+**Frontend**
+- `types.ts` — `FeatureFlags.demo_mode: false` in `DEFAULT_FLAGS`;
+  `UniverseCompany.demoReady?: boolean`.
+- `screens/Settings.tsx` — new `DemoModePanel()` between USAGE and PROVIDERS.
+  Shows `$N.NN this month · $0.00 / run`, lists cached tickers, single
+  switch. Copy spells out the seed-once-then-replay model.
+- `screens/AddCompanies.tsx` — `Card` accepts a `demoMode` prop; when on,
+  rows with `demoReady` get a tiny `DEMO READY` amber chip next to the
+  ticker label. Hooked via `useFeatureFlags()` in `Browse`. New
+  `.ac-demochip` style.
+
+**Decisions baked in**
+- Stage-level interception (not at `anthropic_client.complete()`): each
+  stage owns its replay/save branch; no fake SDK response shapes. One short
+  block at the top of each stage.
+- Fixture-file-per-ticker (not per-stage): one read + one write per stage
+  call; the on-disk schema is fully inspectable in one place.
+- Real run **always** overwrites the fixture on success — re-seeding is
+  literally what happens every time you run with demo mode off.
+- No synthetic data ever: tickers without a fixture are skipped cleanly in
+  demo mode. Honours `feedback_no_demo_anchor`.
+- COST / DIS / SNOW (listed in `web/src/data/supported.ts` but not in the
+  seeded `_seed_*` helpers) carry NO bootstrap fixture. They get one the
+  first time the user runs them with demo mode off. Per the discussion
+  with the user — no hand-authored numbers.
+- Examiner overlay (front-end animation) unchanged; it still plays
+  identically in both modes.
+
+**Verification done**
+- `npm run build` (web) — 111 modules, tsc clean.
+- `python -c "from ao.main import app; print(len(app.routes))"` → 49 routes.
+- `demo_fixtures.has_fixture('NVDA')` True; `list_tickers()` →
+  `['MU', 'NVDA', 'SNDK']`.
+- ASGI in-process smoke test:
+  - `GET /settings/flags` defaults `demo_mode: False`.
+  - `PUT /settings/flags {demo_mode: True}` persists across re-fetch.
+  - `GET /universe` rows: NVDA & MU have `demoReady: true`; SNDK is absent
+    from `sp500_seed.py` so doesn't surface a chip (expected — its fixture
+    still replays on RUN ALL).
+- Stage replay sanity:
+  - NVDA extraction → 7 metric rows, first key `Revenue`.
+  - NVDA validation → `passed=True, conflict=False`.
+  - NVDA narrative → seeded sentence returned.
+  - SNDK validation → `passed=False, conflict=True` (routes to REVIEW).
+  - AAPL extraction (no fixture) → `[]`, clean skip log.
+
+**Files touched**
+- `workers/ao/agents/demo_fixtures.py` (new)
+- `workers/ao/agents/pipeline.py`
+- `workers/ao/agents/extraction.py`
+- `workers/ao/agents/validation.py`
+- `workers/ao/agents/narrative.py`
+- `workers/ao/agents/confidence.py`
+- `workers/ao/db/models.py` (FeatureFlag.demo_mode)
+- `workers/ao/db/engine.py` (_COLUMN_MIGRATIONS)
+- `workers/ao/api/schemas.py` (FeatureFlags.demo_mode, UniverseCompany.demoReady)
+- `workers/ao/api/serializers.py` (serialize_feature_flags)
+- `workers/ao/api/routes_settings.py` (PUT /flags)
+- `workers/ao/api/routes_universe.py` (demoReady)
+- `workers/ao/fixtures/{NVDA,SNDK,MU}/fixture.json` (new, committed)
+- `workers/scripts/export_seed_fixtures.py` (new)
+- `web/src/types.ts`
+- `web/src/screens/Settings.tsx` (new DemoModePanel)
+- `web/src/screens/AddCompanies.tsx` (DEMO READY chip)
+- `web/src/styles/app.css` (`.ac-demochip`)
+- `.gitignore` (fixtures exception)
+
+**Next step**
+Visual QA against a running app:
+1. `/settings` → DEMO MODE panel sits below USAGE, above PROVIDERS. Toggle
+   on; status line shows `Fixtures cached: MU, NVDA, SNDK`.
+2. `/companies` → ADD COMPANIES — with demo mode on, NVDA / MU rows
+   render a DEMO READY chip. (SNDK is not in the S&P 500 grid.)
+3. Wipe → add NVDA → RUN ALL AGENTS. Examiner overlay plays; `/activity`
+   shows four rows tagged `model="demo-fixture"` with cost 0. Watchlist
+   refreshes; NVDA deep-dive shows extraction table, narrative card, and
+   confidence donut populated from the fixture.
+4. Add AAPL → RUN ALL → `/activity` shows a single skip row
+   `demo_mode: no fixture for AAPL`. No Result rows created.
+5. Toggle demo mode off; add Anthropic key → RUN ALL on AAPL → real Opus
+   runs; afterwards `workers/ao/fixtures/AAPL/fixture.json` exists and a
+   subsequent demo-on run replays it.
+
+---
+
 ## Increment — predicted filing window now shows after the first filing
 
 **Goal:** the FILING TIMELINE screen draws a future "predicted window" bar

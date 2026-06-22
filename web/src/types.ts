@@ -121,11 +121,13 @@ export type FeatureFlags = {
   consensus: boolean
   conflict: boolean
   guidance: boolean
+  demo_mode: boolean
 }
 export const DEFAULT_FLAGS: FeatureFlags = {
   consensus: true,
   conflict: true,
   guidance: true,
+  demo_mode: false,
 }
 
 /* Validation tolerance bands. Two cross-document sources must agree
@@ -390,6 +392,7 @@ export type UniverseCompany = {
   earnDays: number      // days-from-now until next earnings (sort key)
   tracked: boolean      // already on this user's watchlist
   logoUrl?: string | null
+  demoReady?: boolean   // a demo-mode fixture exists for this ticker on disk
 }
 
 export type DiscoveryStatus = {

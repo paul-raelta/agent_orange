@@ -1,7 +1,7 @@
 """Narrative summary — Opus, 2–3 sentences, hard token cap."""
 from __future__ import annotations
 
-from ao.agents import prompts
+from ao.agents import demo_fixtures, prompts
 from ao.agents.registry import model_for
 from ao.agents.runlog import run_log
 from ao.integrations import anthropic_client
@@ -18,6 +18,8 @@ async def write_narrative(
     current: dict[str, str],
     prior_q: dict[str, str] | None = None,
     prior_y: dict[str, str] | None = None,
+    demo_replay: bool = False,
+    demo_save: bool = False,
 ) -> str | None:
     """Produce a 2-3 sentence "what's worth knowing" summary.
 
@@ -25,6 +27,21 @@ async def write_narrative(
     """
     async with run_log(session, user_id, ticker, stage="narrative",
                        company_id=company_id) as rec:
+        if demo_replay:
+            payload = demo_fixtures.load(ticker) or {}
+            text = demo_fixtures.to_narrative(payload.get("narrative"))
+            rec.set(
+                level="ok" if text else "info",
+                model="demo-fixture", cost_usd=0.0,
+                input_tokens=0, output_tokens=0,
+                message=(
+                    f"Replayed narrative ({len(text)} chars)."
+                    if text else
+                    "demo_mode: no narrative fixture; skipped."
+                ),
+            )
+            return text
+
         if not anthropic_client.is_configured():
             rec.set(level="warn",
                     message="ANTHROPIC_API_KEY not set — narrative skipped.")
@@ -65,4 +82,6 @@ async def write_narrative(
             output_tokens=result["output_tokens"],
             cost_usd=result["cost_usd"],
         )
+        if demo_save and text:
+            demo_fixtures.save(ticker, "narrative", text)
         return text or None

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ao.agents import prompts
+from ao.agents import demo_fixtures, prompts
 from ao.agents.registry import model_for
 from ao.agents.runlog import run_log
 from ao.integrations import anthropic_client, pdf_extractor
@@ -58,14 +58,38 @@ def _build_pages_payload(pages: list[pdf_extractor.Page]) -> str:
 async def extract_filing(
     session, user_id: str, *,
     company_id: str, ticker: str, pdf_path: Path,
+    demo_replay: bool = False,
+    demo_save: bool = False,
+    fixture_filing: dict | None = None,
 ) -> list[ExtractedMetric]:
     """Run the extraction stage against a cached PDF.
 
     Returns the verified ExtractedMetric list. The caller persists them into
     Metric + Provenance rows (we don't touch the DB here beyond agent_runs).
+
+    `demo_replay`: short-circuit the Anthropic call and return the cached
+    fixture for this ticker. Records an agent_runs row tagged
+    `model="demo-fixture"`, cost 0.
+
+    `demo_save`: after a successful real run, persist the extracted metrics to
+    the per-ticker fixture file (best-effort, never raises).
     """
     async with run_log(session, user_id, ticker, stage="extraction",
                        company_id=company_id) as rec:
+        if demo_replay:
+            payload = demo_fixtures.load(ticker) or {}
+            replay = demo_fixtures.to_extracted_metrics(payload.get("extraction"))
+            rec.set(
+                level="ok", model="demo-fixture", cost_usd=0.0,
+                input_tokens=0, output_tokens=0,
+                message=(
+                    f"Replayed {len(replay)} extraction rows from fixture."
+                    if replay else
+                    "demo_mode: no extraction fixture; returning empty."
+                ),
+            )
+            return replay
+
         if not anthropic_client.is_configured():
             rec.set(level="warn",
                     message="ANTHROPIC_API_KEY not set — extraction skipped.")
@@ -123,4 +147,12 @@ async def extract_filing(
                 verified=verified,
             ))
         rec.set(message=f"Extracted {len(out)} metric locations from {pdf_path.name}.")
+
+        if demo_save and out:
+            demo_fixtures.save(
+                ticker, "extraction",
+                demo_fixtures.extracted_metrics_to_payload(out),
+                filing=fixture_filing,
+            )
+
         return out

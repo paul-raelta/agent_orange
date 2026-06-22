@@ -10,6 +10,7 @@ import {
   useDeleteDataSource,
   useFeatureFlags,
   useNotificationPrefs,
+  useUniverse,
   useValidationThresholds,
   usePatchDataSource,
   useProviders,
@@ -106,6 +107,8 @@ export function Settings() {
           ))}
         </div>
       </Panel>
+
+      <DemoModePanel />
 
       <Panel title="PROVIDERS">
         <div className="prov-grid">
@@ -446,6 +449,63 @@ function FeatureFlagsPanel() {
         Off = the surface disappears; nothing else is touched. No restart, no
         migration. Backend skips disabled features — no estimate fetches, no
         guidance extraction, no workspace payload.
+      </p>
+    </Panel>
+  )
+}
+
+/* ----------------------------------------------------------------------- */
+/* DEMO MODE — bypass Anthropic by replaying cached real extractions.      */
+/* Real runs save their output as a fixture per ticker; demo runs replay   */
+/* it. Tickers without a fixture are skipped cleanly when demo mode is on. */
+/* ----------------------------------------------------------------------- */
+
+function DemoModePanel() {
+  const { flags, setFlag, saving } = useFeatureFlags()
+  const { data: usage } = useUsage()
+  const { data: universe } = useUniverse()
+  const ready = (universe ?? []).filter((u) => u.demoReady).map((u) => u.ticker)
+  const monthCost = usage?.monthCost ?? 0
+  return (
+    <Panel
+      title="DEMO MODE"
+      right={
+        <span className="hint">
+          bypasses LLM calls · uses cached real extractions
+        </span>
+      }
+    >
+      <div className="ff-list">
+        <div className="ff-row">
+          <div className="ff-info">
+            <div className="ff-name">Replay cached extractions</div>
+            <div className="ff-desc">
+              When on, the pipeline skips Anthropic and replays the last real
+              extraction saved for each ticker. Each real run (demo mode off)
+              re-saves the fixture, so it stays current.
+            </div>
+            <div className="ff-surf">
+              ▸ Live cost: ${monthCost.toFixed(2)} this month · In demo mode: $0.00 / run
+            </div>
+            <div className="ff-surf">
+              ▸ Fixtures cached: {ready.length ? ready.join(', ') : '— none yet'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={'sw' + (flags.demo_mode ? ' on' : '')}
+            onClick={() => setFlag('demo_mode', !flags.demo_mode)}
+            aria-label="Toggle demo mode"
+            aria-pressed={flags.demo_mode}
+            disabled={saving}
+          />
+        </div>
+      </div>
+      <p className="ff-note">
+        Tickers without a cached fixture are skipped (logged in /activity) when
+        demo mode is on — nothing is faked. To seed a new ticker, add it, turn
+        demo mode off, and run once. The real Opus extraction overwrites the
+        fixture for next time.
       </p>
     </Panel>
   )

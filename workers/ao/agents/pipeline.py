@@ -15,8 +15,9 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ao.agents import confidence, extraction, monitoring, narrative, validation
+from ao.agents import confidence, demo_fixtures, extraction, monitoring, narrative, validation
 from ao.agents.runlog import run_log
+from ao.api.serializers import serialize_feature_flags
 from ao.db import models as m
 from ao.integrations import edgar_client
 from ao.logging import get_logger
@@ -77,6 +78,34 @@ def _eps_gap(
     return gaap, non_gaap, sign_flip
 
 
+async def _resolve_demo_filing(
+    session: AsyncSession, company: m.Company, fixture_filing: dict | None,
+) -> m.Filing | None:
+    """For demo mode: return the most recent Filing row, or synthesise one
+    from the fixture's `filing` block if none exists yet."""
+    existing = (await session.execute(
+        select(m.Filing).where(m.Filing.company_id == company.id)
+        .order_by(desc(m.Filing.period_end)).limit(1)
+    )).scalar_one_or_none()
+    if existing is not None:
+        return existing
+    if not fixture_filing:
+        return None
+    row = m.Filing(
+        id=uuid4().hex,
+        company_id=company.id,
+        form_type=fixture_filing.get("form_type") or fixture_filing.get("form") or "10-Q",
+        period=fixture_filing.get("period", "?"),
+        period_end=fixture_filing.get("period_end", ""),
+        reported_on=fixture_filing.get("reported_on") or _now(),
+        accession=fixture_filing.get("accession"),
+        source_url=fixture_filing.get("source_url"),
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
 async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
     """Run a single end-to-end pipeline pass for one ticker."""
     ticker = ticker.upper()
@@ -89,34 +118,81 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
         log.warning("pipeline.unknown_ticker", ticker=ticker)
         return
 
-    # --- 1. Monitor ----------------------------------------------------
-    new_filing = await monitoring.poll_company(session, user_id, company)
-    if new_filing is None:
+    flags = await serialize_feature_flags(session, user_id)
+    demo_mode = bool(flags.demo_mode)
+    demo_replay = demo_mode and demo_fixtures.has_fixture(ticker)
+    demo_save = not demo_mode  # only persist fixtures from real runs
+
+    if demo_mode and not demo_replay:
+        async with run_log(session, user_id, ticker, stage="extraction",
+                           company_id=company.id) as rec:
+            rec.set(
+                level="info", model="demo-fixture", cost_usd=0.0,
+                message=(
+                    f"demo_mode: no fixture for {ticker}; skipping pipeline. "
+                    f"Run once with demo mode off to seed it."
+                ),
+            )
         return
 
-    # --- 2. Download the primary doc ----------------------------------
-    if new_filing.source_url and company.cik:
-        try:
-            local = await edgar_client.download_filing(
-                company.cik, new_filing.accession or "", new_filing.source_url,
-            )
-            new_filing.local_path = str(local)
-            await session.commit()
-        except Exception as exc:  # noqa: BLE001
-            async with run_log(session, user_id, ticker, stage="download",
+    new_filing: m.Filing | None
+    if demo_replay:
+        # --- Demo path: skip monitor + download, replay fixtures ----------
+        fixture_payload = demo_fixtures.load(ticker) or {}
+        new_filing = await _resolve_demo_filing(
+            session, company, fixture_payload.get("filing"),
+        )
+        if new_filing is None:
+            async with run_log(session, user_id, ticker, stage="extraction",
                                company_id=company.id) as rec:
-                rec.set(level="error", message=f"Filing download failed: {exc}")
+                rec.set(
+                    level="error", model="demo-fixture",
+                    message=(
+                        "demo_mode: fixture has no filing block and no "
+                        "prior Filing row exists; cannot replay."
+                    ),
+                )
+            return
+    else:
+        # --- 1. Monitor ------------------------------------------------
+        new_filing = await monitoring.poll_company(session, user_id, company)
+        if new_filing is None:
             return
 
-    if not new_filing.local_path:
-        return
+        # --- 2. Download the primary doc ------------------------------
+        if new_filing.source_url and company.cik:
+            try:
+                local = await edgar_client.download_filing(
+                    company.cik, new_filing.accession or "", new_filing.source_url,
+                )
+                new_filing.local_path = str(local)
+                await session.commit()
+            except Exception as exc:  # noqa: BLE001
+                async with run_log(session, user_id, ticker, stage="download",
+                                   company_id=company.id) as rec:
+                    rec.set(level="error", message=f"Filing download failed: {exc}")
+                return
+
+        if not new_filing.local_path:
+            return
 
     # --- 3. Extract ----------------------------------------------------
     from pathlib import Path
+    fixture_filing_meta = {
+        "form_type": new_filing.form_type,
+        "period": new_filing.period,
+        "period_end": new_filing.period_end,
+        "reported_on": new_filing.reported_on,
+        "accession": new_filing.accession,
+        "source_url": new_filing.source_url,
+    } if demo_save else None
     extracted = await extraction.extract_filing(
         session, user_id,
         company_id=company.id, ticker=ticker,
-        pdf_path=Path(new_filing.local_path),
+        pdf_path=Path(new_filing.local_path or ""),
+        demo_replay=demo_replay,
+        demo_save=demo_save,
+        fixture_filing=fixture_filing_meta,
     )
     if not extracted:
         return
@@ -126,6 +202,8 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
         session, user_id,
         company_id=company.id, ticker=ticker,
         extracted=extracted,
+        demo_replay=demo_replay,
+        demo_save=demo_save,
     )
 
     # Group extracted metric locations by key. The accepted display_value is
@@ -233,6 +311,8 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
         story = await narrative.write_narrative(
             session, user_id,
             company_id=company.id, ticker=ticker, current=current,
+            demo_replay=demo_replay,
+            demo_save=demo_save,
         )
         if story:
             result_row.narrative = story
@@ -243,6 +323,8 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
     # low-confidence signal that should drag the score down.
     await confidence.assess_confidence(
         session, user_id, company_id=company.id, ticker=ticker,
+        demo_replay=demo_replay,
+        demo_save=demo_save,
     )
 
     # --- 7. Notify ----------------------------------------------------

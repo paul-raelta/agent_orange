@@ -9,7 +9,7 @@ import { api } from '../api'
 import { Btn } from '../components/primitives'
 import { Loading } from '../components/Loading'
 import { Reveal } from '../motion/motion'
-import { useAddCompanies, useUniverse } from '../hooks'
+import { useAddCompanies, useFeatureFlags, useUniverse } from '../hooks'
 import { SP500_SECTORS } from '../data/sp500'
 import { SUPPORTED_TICKERS } from '../data/supported'
 import type { DiscoveryResult, UniverseCompany } from '../types'
@@ -59,11 +59,13 @@ function Card({
   selected,
   onToggle,
   index = 0,
+  demoMode = false,
 }: {
   c: UniverseCompany
   selected: boolean
   onToggle: (t: string) => void
   index?: number
+  demoMode?: boolean
 }) {
   return (
     <div
@@ -74,7 +76,14 @@ function Card({
       <div className="ac-card-top">
         <MonoGlyph ticker={c.ticker} logoUrl={c.logoUrl} />
         <div className="ac-id">
-          <div className="ac-tkr">{c.ticker}</div>
+          <div className="ac-tkr">
+            {c.ticker}
+            {demoMode && c.demoReady && (
+              <span className="ac-demochip" title="Cached demo-mode fixture available">
+                DEMO READY
+              </span>
+            )}
+          </div>
           <div className="ac-name">{c.name}</div>
         </div>
         {c.tracked ? <span className="ac-trackchip">TRACKING</span> : <span className="ac-check">✓</span>}
@@ -184,6 +193,8 @@ function Browse({
   const [tSortKey, setTSortKey] = useState<SortKey>('mcap')
   const [tSortDir, setTSortDir] = useState(-1)
   const [rippling, setRippling] = useState<Record<string, boolean>>({})
+  const { flags } = useFeatureFlags()
+  const demoMode = !!flags.demo_mode
 
   const sectorCounts = useMemo(() => {
     const m: Record<string, number> = {}
@@ -349,6 +360,7 @@ function Browse({
                 selected={selected.has(c.ticker)}
                 onToggle={toggle}
                 index={i}
+                demoMode={demoMode}
               />
             ))}
           </Reveal>
@@ -401,6 +413,7 @@ function Browse({
                       selected={selected.has(c.ticker)}
                       onToggle={toggle}
                       index={i}
+                      demoMode={demoMode}
                     />
                   ))}
                 </Reveal>

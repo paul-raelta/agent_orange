@@ -66,6 +66,7 @@ async def put_flags(
     row.consensus = bool(body.consensus)
     row.conflict = bool(body.conflict)
     row.guidance = bool(body.guidance)
+    row.demo_mode = bool(body.demo_mode)
     await db.commit()
     return await serialize_feature_flags(db, user_id)
 
