@@ -1,0 +1,191 @@
+{
+  "extraction": [
+    {
+      "key": "Revenue",
+      "display_value": "$1.39B",
+      "raw_value": 1390.951,
+      "page": 15,
+      "quote": "Revenue$1,390,951 $1,042,074 Cost of revenue464,500 348,786 Gross profit926,451 693,288",
+      "source_label": "Condensed consolidated statements of operations",
+      "verified": false
+    },
+    {
+      "key": "Revenue",
+      "display_value": "$1.39B",
+      "raw_value": 1390.951,
+      "page": 19,
+      "quote": "Three Months Ended April 30,20262025Revenue$1,390,951 $1,042,074",
+      "source_label": "Segment information",
+      "verified": false
+    },
+    {
+      "key": "Revenue",
+      "display_value": "$1.39B",
+      "raw_value": 1390.951,
+      "page": 22,
+      "quote": "Product revenue$1,334,329 $996,813 Professional services and other revenue56,622 45,261 Total$1,390,951 $1,042,074",
+      "source_label": "Revenue disaggregation",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$(295.6)M",
+      "raw_value": -295.571,
+      "page": 16,
+      "quote": "Net loss(295,571)(429,952)Less: net income attributable to noncontrolling interest\u2014 140 Net loss attributable to Snowflake Inc.$(295,571)$(430,092)",
+      "source_label": "Condensed consolidated statements of operations",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$(295.6)M",
+      "raw_value": -295.571,
+      "page": 17,
+      "quote": "Net loss$(295,571)$(429,952)",
+      "source_label": "Statements of cash flows (GAAP)",
+      "verified": false
+    },
+    {
+      "key": "Net income",
+      "display_value": "$(295.6)M",
+      "raw_value": -295.571,
+      "page": 46,
+      "quote": "Net loss$(295,571)",
+      "source_label": "Net loss per share calculation (GAAP)",
+      "verified": false
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$(0.86)",
+      "raw_value": -0.86,
+      "page": 16,
+      "quote": "Net loss per share attributable to Snowflake Inc. common stockholders\u2014basic and diluted$(0.86)$(1.29)",
+      "source_label": "Condensed consolidated statements of operations (GAAP)",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 basic",
+      "display_value": "$(0.86)",
+      "raw_value": -0.86,
+      "page": 16,
+      "quote": "Net loss per share attributable to Snowflake Inc. common stockholders\u2014basic and diluted$(0.86)$(1.29)",
+      "source_label": "Condensed consolidated statements of operations (GAAP)",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$(0.86)",
+      "raw_value": -0.86,
+      "page": 46,
+      "quote": "Net loss per share attributable to Snowflake Inc. common stockholders\u2014basic and diluted$(0.86)$(1.29)",
+      "source_label": "Net loss per share table (GAAP)",
+      "verified": false
+    },
+    {
+      "key": "EPS \u00b7 basic",
+      "display_value": "$(0.86)",
+      "raw_value": -0.86,
+      "page": 46,
+      "quote": "Net loss per share attributable to Snowflake Inc. common stockholders\u2014basic and diluted$(0.86)$(1.29)",
+      "source_label": "Net loss per share table (GAAP)",
+      "verified": false
+    },
+    {
+      "key": "Gross margin",
+      "display_value": "66.6%",
+      "raw_value": 66.6,
+      "page": 16,
+      "quote": "Revenue$1,390,951 $1,042,074 Cost of revenue464,500 348,786 Gross profit926,451 693,288",
+      "source_label": "Condensed consolidated statements of operations (GAAP, computed)",
+      "verified": true
+    }
+  ],
+  "filing": {
+    "form_type": "10-Q",
+    "period": "10-Q",
+    "period_end": "2026-05-29",
+    "reported_on": "2026-05-29",
+    "accession": "0001640147-26-000030",
+    "source_url": "snow-20260430.htm"
+  },
+  "validation": {
+    "passed": true,
+    "rule": "Each metric must appear in \u22652 distinct locations OR have one high-confidence source (income statement). Material conflicts MUST be flagged.",
+    "detail": "All five metrics pass validation. Revenue appears in three agreeing locations (income statement, segment note, disaggregation note). Net income appears in three agreeing locations (income statement, cash flow statement, EPS table). Both EPS metrics appear in two agreeing GAAP locations each. Gross margin is computed from verified income-statement figures and is internally consistent (926,451 / 1,390,951 = 66.67%, rounds to 66.6%). No material conflicts detected across any metric.",
+    "corroborations": 5,
+    "conflict": false,
+    "per_metric": [
+      {
+        "key": "Revenue",
+        "conf": "high",
+        "reason": "Three distinct sources all report exactly $1,390,951K: the consolidated income statement (p.15), segment information (p.19), and revenue disaggregation note (p.22, verified). All values agree within 0.0%, well inside the 1% tolerance threshold.",
+        "accept_value": "$1.39B (1,390,951)",
+        "alternative_values": []
+      },
+      {
+        "key": "Net income",
+        "conf": "high",
+        "reason": "Three distinct GAAP sources all report exactly $(295,571)K: the consolidated income statement (p.16, verified), statement of cash flows (p.17), and the EPS calculation table (p.46). Full agreement with 0% variance, well inside the 1% tolerance threshold.",
+        "accept_value": "$(295.6)M (-295,571)",
+        "alternative_values": []
+      },
+      {
+        "key": "EPS \u00b7 diluted",
+        "conf": "high",
+        "reason": "Two distinct GAAP sources both report $(0.86): the consolidated income statement (p.16, verified) and the net loss per share table (p.46). Values are identical ($0.000 difference), within the $0.001 EPS tolerance. No non-GAAP figure present; no GAAP vs. non-GAAP comparison required.",
+        "accept_value": "$(0.86)",
+        "alternative_values": []
+      },
+      {
+        "key": "EPS \u00b7 basic",
+        "conf": "high",
+        "reason": "Two distinct GAAP sources both report $(0.86): the consolidated income statement (p.16, verified) and the net loss per share table (p.46). Values are identical ($0.000 difference), within the $0.001 EPS tolerance. For a net-loss period, basic and diluted EPS are the same by construction (antidilutive shares excluded), which is consistent with both figures being $(0.86).",
+        "accept_value": "$(0.86)",
+        "alternative_values": []
+      },
+      {
+        "key": "Gross margin",
+        "conf": "high",
+        "reason": "Derived directly from verified income-statement figures on p.16: Gross profit $926,451K \u00f7 Revenue $1,390,951K = 66.68%, which rounds to 66.6% (within the 0.1% margin tolerance). Single high-confidence source (income statement), verified flag set to true.",
+        "accept_value": "66.6%",
+        "alternative_values": []
+      }
+    ]
+  },
+  "narrative": "No prior-quarter or prior-year figures were provided, so only current-period data is available. Revenue was $1.39B with a gross margin of 66.6%, while the company recorded a net loss of $295.6M, or $(0.86) per diluted share. Without comparative periods, quarter-over-quarter and year-over-year changes cannot be calculated.",
+  "confidence": {
+    "overall_pct": 52,
+    "band": "medium",
+    "summary": "The filing itself is internally pristine (GAAP-only EPS, 5/5 high-confidence corroborations, no validation conflicts), but confidence is meaningfully dragged down by three offsetting concerns: only one historical period is available (no trend to validate), a massive net insider sell of ~$2.25 B signals insiders are aggressively distributing shares, and price-trend data is effectively absent (2 data points, 0 coverage days), making alignment unassessable.",
+    "factors": [
+      {
+        "name": "Inter-document agreement",
+        "weight": 0.35,
+        "impact": "positive",
+        "signal": "GAAP-only EPS (eps_gap: null); validation passed; 5/5 high-conf corroborations across 8 distinct sources",
+        "detail": "The 10-Q contains 5 extracted metrics, all rated high-confidence, with zero medium or low-confidence readings. Validation passed with no flagged conflicts. eps_gap is null, meaning the filing reports GAAP-only EPS \u2014 the cleanest possible case per scoring rules. Five independent corroborations across 8 distinct source locations within the document provide strong internal coherence. This factor contributes maximally to the score."
+      },
+      {
+        "name": "Cross-source consistency",
+        "weight": 0.25,
+        "impact": "negative",
+        "signal": "Only 1 period available; EPS series: [-0.86]; 0 sign reversals; 0 low-conf period metrics",
+        "detail": "Only a single period (10-Q) is on record, yielding an EPS series of just one data point [-0.86]. While there are no sign reversals or low-confidence period metrics \u2014 trivially, since there is nothing to reverse against \u2014 the single-period coverage means cross-source trend continuity cannot be established. A one-point series provides no meaningful cross-temporal validation, significantly limiting confidence in this dimension."
+      },
+      {
+        "name": "Insider activity & news",
+        "weight": 0.28,
+        "impact": "negative",
+        "signal": "0 buys, 50 sells, net insider value: -$2,253,415,562.93 over 90 days; headlines broadly sector-agnostic or mixed",
+        "detail": "Insider activity is heavily one-sided: 50 sells, 0 buys, and a net disposal value of approximately -$2.25 B over the past 90 days. This is a strong bearish insider signal \u2014 insiders at this scale are not making routine diversification moves. The 10 recent headlines are largely unrelated to the specific company (SpaceX IPO, Tesla, Anthropic, Snowflake, software sector pressure), providing no corroborating positive newsflow to offset the insider distribution. The software-sector-pressure theme ('Software Stocks Are Sinking in 2026') is mildly consistent with a bearish insider read. Net effect: meaningfully negative for data confidence, as insider behavior contradicts any bullish read of the filing."
+      },
+      {
+        "name": "Price-trend alignment",
+        "weight": 0.12,
+        "impact": "neutral",
+        "signal": "data_points: 2, coverage_days: 0, pct_change_30d: null, pct_change_90d: null, price_slope_sign: +1, aligns_with_price: null",
+        "detail": "Price coverage is critically thin: only 2 data points spanning 0 days, with both 30-day and 90-day percent changes unavailable. The price_slope_sign of +1 and earnings_direction of 0 (flat/loss) technically do not align, but aligns_with_price is null and no reliable price series exists to draw conclusions. Per scoring rules, this factor is heavily down-weighted to 0.12 given the near-total absence of usable price data. It contributes neither positively nor negatively in a meaningful way."
+      }
+    ]
+  }
+}

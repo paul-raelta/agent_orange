@@ -1,0 +1,157 @@
+{
+  "extraction": [
+    {
+      "key": "Revenue",
+      "display_value": "$25.2B",
+      "raw_value": 25168.0,
+      "page": 18,
+      "quote": "Total revenues25,168 23,621 51,149 48,311",
+      "source_label": "Condensed consolidated statements of income",
+      "verified": true
+    },
+    {
+      "key": "Revenue",
+      "display_value": "$25.2B",
+      "raw_value": 25168.0,
+      "page": 42,
+      "quote": "Revenues for the quarter increased 7%, or $1.5 billion, to $25.2 billion",
+      "source_label": "MD&A \u00b7 Consolidated Results",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$2,465M",
+      "raw_value": 2465.0,
+      "page": 18,
+      "quote": "Net income2,465 3,401 4,949 6,045",
+      "source_label": "Condensed consolidated statements of income",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$2.2B",
+      "raw_value": 2247.0,
+      "page": 18,
+      "quote": "Net income attributable to The Walt Disney Company (Disney)$2,247 $3,275 $4,649 $5,829",
+      "source_label": "Condensed consolidated statements of income (attributable to Disney)",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$2.2B",
+      "raw_value": 2247.0,
+      "page": 42,
+      "quote": "net income attributable to Disney decreased to $2.2 billion compared to $3.3 billion in the prior-year quarter",
+      "source_label": "MD&A \u00b7 Consolidated Results",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$1.27",
+      "raw_value": 1.27,
+      "page": 18,
+      "quote": "Earnings per share attributable to Disney:Diluted$1.27 $1.81 $2.61 $3.21",
+      "source_label": "Condensed consolidated statements of income (GAAP)",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$1.27",
+      "raw_value": 1.27,
+      "page": 42,
+      "quote": "diluted earnings per share (EPS) attributable to Disney decreased to $1.27 compared to $1.81 in the prior-year quarter",
+      "source_label": "MD&A \u00b7 Consolidated Results (GAAP)",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 basic",
+      "display_value": "$1.27",
+      "raw_value": 1.27,
+      "page": 18,
+      "quote": "Basic$1.27 $1.81 $2.62 $3.22",
+      "source_label": "Condensed consolidated statements of income (GAAP)",
+      "verified": true
+    }
+  ],
+  "filing": {
+    "form_type": "10-Q",
+    "period": "10-Q",
+    "period_end": "2026-05-06",
+    "reported_on": "2026-05-06",
+    "accession": "0001744489-26-000037",
+    "source_url": "dis-20260328.htm"
+  },
+  "validation": {
+    "passed": true,
+    "rule": "Each metric must appear in \u22652 distinct locations OR have one high-confidence source (income statement). Material conflicts MUST be flagged.",
+    "detail": "All four metrics pass validation. Revenue and EPS\u00b7diluted are confirmed by two agreeing sources each. Net income requires careful interpretation: total consolidated net income ($2,465M) and Disney-attributable net income ($2,247M) are distinct line items (not a conflict), and the attributable figure is corroborated by both the income statement and MD&A. EPS\u00b7basic appears in a single high-confidence income statement source. No material conflicts detected.",
+    "corroborations": 7,
+    "conflict": false,
+    "per_metric": [
+      {
+        "key": "Revenue",
+        "conf": "high",
+        "reason": "Two distinct sources agree exactly: income statement (page 18, raw 25168.0) and MD&A Consolidated Results (page 42, '$25.2 billion'). Rounded MD&A figure is consistent within 0.1% of the precise income statement value. High confidence.",
+        "accept_value": "$25,168M",
+        "alternative_values": []
+      },
+      {
+        "key": "Net income (attributable to Disney)",
+        "conf": "high",
+        "reason": "The $2,465M figure is total consolidated net income (including noncontrolling interests) \u2014 a separate, valid line item. Disney-attributable net income of $2,247M is confirmed by both the income statement (page 18) and MD&A (page 42, '$2.2 billion'), agreeing within 1%. No conflict; the two net income figures represent different scopes. High confidence on the attributable figure.",
+        "accept_value": "$2,247M",
+        "alternative_values": []
+      },
+      {
+        "key": "EPS \u00b7 diluted",
+        "conf": "high",
+        "reason": "Two GAAP sources agree exactly at $1.27: income statement (page 18) and MD&A Consolidated Results (page 42). Both are explicitly labeled GAAP. No non-GAAP figure present, so no GAAP vs. non-GAAP comparison needed. High confidence.",
+        "accept_value": "$1.27",
+        "alternative_values": []
+      },
+      {
+        "key": "EPS \u00b7 basic",
+        "conf": "med",
+        "reason": "Single source: income statement (page 18, GAAP). No second location found. Source is a high-confidence primary financial statement, but the one-source rule caps confidence at med absent a second corroborating location.",
+        "accept_value": "$1.27",
+        "alternative_values": []
+      }
+    ]
+  },
+  "narrative": "No prior-quarter or prior-year data was provided, so relative comparisons cannot be made. Revenue was $25.2B, net income was $2.2B, and diluted EPS was $1.27 for the current quarter.",
+  "confidence": {
+    "overall_pct": 67,
+    "band": "medium",
+    "summary": "The filing itself is clean \u2014 GAAP-only EPS (no gap), validation passed, and 7 corroborations across 5 distinct sources push confidence up. The dominant drag is the single available period in the EPS series (no historical continuity to verify) and effectively no usable price-trend data (only 2 data points, 0 coverage days), leaving cross-source and price-alignment factors heavily down-weighted.",
+    "factors": [
+      {
+        "name": "Inter-document agreement",
+        "weight": 0.35,
+        "impact": "positive",
+        "signal": "Clean GAAP-only EPS (eps_gap: null), validation passed, no conflicts",
+        "detail": "eps_gap is null, meaning the filing reports GAAP-only EPS \u2014 the cleanest possible case. Validation passed with zero conflicts flagged. 7 corroborations were found across 5 distinct sources for 4 metrics, with a conf_tally of 2 high / 2 med / 0 low. No red flags anywhere in the intra-document picture."
+      },
+      {
+        "name": "Cross-source consistency",
+        "weight": 0.3,
+        "impact": "neutral",
+        "signal": "Only 1 period available; EPS = $1.27, 0 sign reversals, 0 low-conf periods",
+        "detail": "Only 1 period (10-Q) is available in the EPS series ([1.27]), so there is no historical continuity to assess. While the single data point shows no sign reversals and zero periods with low-confidence metrics, a single observation cannot confirm trend stability or cross-period coherence. This fundamentally limits the weight this factor can carry."
+      },
+      {
+        "name": "Insider activity & news",
+        "weight": 0.25,
+        "impact": "positive",
+        "signal": "Net insider buying of ~$9M over 90 days; headlines corroborate strong operational momentum",
+        "detail": "Over the 90-day insider window: 10 buys vs. 9 sells, with a net buy value of $8,997,141.52 \u2014 a meaningful net positive despite near-balanced transaction count, suggesting larger buy sizes. Recent headlines are broadly supportive: Toy Story 5 debuted with the biggest opening weekend of 2026 ($160M), franchise records, and a Shanghai resort expansion. No headlines contradict or raise doubts about reported financials."
+      },
+      {
+        "name": "Price-trend alignment",
+        "weight": 0.1,
+        "impact": "neutral",
+        "signal": "Price data severely limited: 2 data points, 0 coverage days, no 30d/90d change available",
+        "detail": "Price coverage is critically thin \u2014 only 2 data points over 0 coverage days, with pct_change_30d and pct_change_90d both null and aligns_with_price null. The price_slope_sign is +1 (positive direction) and earnings_direction is 0 (neutral/flat), which is neither confirmatory nor contradictory, but the data is far too sparse to draw any meaningful alignment conclusion. This factor is heavily down-weighted to 0.10 as a result."
+      }
+    ]
+  }
+}

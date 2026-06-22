@@ -1,0 +1,121 @@
+{
+  "extraction": [
+    {
+      "key": "Revenue",
+      "display_value": "$1.95B",
+      "raw_value": 1950,
+      "page": 1,
+      "quote": "Revenue of $1.95 billion. GAAP net income of $0.82 per diluted share.",
+      "source_label": "Press release \u2014 fiscal Q4 results",
+      "verified": true
+    },
+    {
+      "key": "Net income",
+      "display_value": "$118M",
+      "raw_value": 118,
+      "page": 11,
+      "quote": "Diluted net income per share $0.79 \u2014 figure differs from press-release headline ($0.82) by $0.03; reconciliation references non-GAAP adjustments.",
+      "source_label": "8-K Exhibit 99.1 \u2014 financial schedules",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$0.82",
+      "raw_value": 0.82,
+      "page": 1,
+      "quote": "Revenue of $1.95 billion. GAAP net income of $0.82 per diluted share.",
+      "source_label": "Press release \u2014 fiscal Q4 results",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$0.79",
+      "raw_value": 0.79,
+      "page": 11,
+      "quote": "Diluted net income per share $0.79 \u2014 figure differs from press-release headline ($0.82) by $0.03; reconciliation references non-GAAP adjustments.",
+      "source_label": "8-K Exhibit 99.1 \u2014 financial schedules",
+      "verified": true
+    }
+  ],
+  "filing": {
+    "form_type": "8-K",
+    "period": "Fiscal Q4 '26",
+    "period_end": "2026-06-27",
+    "reported_on": "2026-07-30",
+    "accession": "0002023554-26-000019",
+    "source_url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002023554"
+  },
+  "validation": {
+    "passed": false,
+    "rule": "Cross-reference EPS in \u22652 locations",
+    "detail": "Press release headline reports diluted EPS $0.82, but the 8-K financial schedule (p.11) shows $0.79. Difference attributed to non-GAAP adjustments \u2014 needs human decision on which figure to record.",
+    "corroborations": 2,
+    "conflict": true,
+    "per_metric": [
+      {
+        "key": "Revenue",
+        "conf": "high",
+        "accept_value": "$1.95B"
+      },
+      {
+        "key": "Net income",
+        "conf": "med",
+        "accept_value": "$118M"
+      },
+      {
+        "key": "EPS \u00b7 diluted",
+        "conf": "low",
+        "accept_value": "$0.82",
+        "reason": "GAAP/non-GAAP gap \u2014 press release $0.82 vs 8-K schedule $0.79.",
+        "alternative_values": [
+          {
+            "value": "$0.82",
+            "source": "Press release headline",
+            "page": 1
+          },
+          {
+            "value": "$0.79",
+            "source": "8-K Exhibit 99.1 (p.11)",
+            "page": 11
+          }
+        ]
+      }
+    ]
+  },
+  "narrative": "",
+  "confidence": {
+    "overall_pct": 35,
+    "band": "low",
+    "summary": "Diluted EPS disagrees across sources by $0.03; press release headline figure conflicts with the 8-K schedule.",
+    "factors": [
+      {
+        "name": "Inter-document agreement",
+        "weight": 0.4,
+        "impact": "negative",
+        "signal": "EPS conflict: $0.82 (press) vs $0.79 (schedule).",
+        "detail": "Routed to review queue \u2014 no auto-resolution."
+      },
+      {
+        "name": "Cross-period consistency",
+        "weight": 0.2,
+        "impact": "neutral",
+        "signal": "Revenue trend stable; net income broadly in line.",
+        "detail": "Only the EPS line shows divergence."
+      },
+      {
+        "name": "Insider and news",
+        "weight": 0.2,
+        "impact": "neutral",
+        "signal": "No significant insider activity; spin-off coverage continues.",
+        "detail": "Balanced buy/sell across last 90 days."
+      },
+      {
+        "name": "Price-trend alignment",
+        "weight": 0.2,
+        "impact": "negative",
+        "signal": "Price slope negative \u2014 market discounted the EPS figure.",
+        "detail": "Drift reflects uncertainty around the GAAP/non-GAAP gap."
+      }
+    ]
+  }
+}

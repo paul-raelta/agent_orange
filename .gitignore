@@ -60,3 +60,13 @@ workers/var/ao.test.db*
 # session handoff scratch
 .handoff/
 *-handoff.sh
+
+# demo-mode fixtures: ship the recommended set (NVDA/SNDK/MU/COST/DIS/SNOW);
+# user-extracted fixtures for other tickers stay local
+workers/ao/fixtures/*
+!workers/ao/fixtures/NVDA/
+!workers/ao/fixtures/SNDK/
+!workers/ao/fixtures/MU/
+!workers/ao/fixtures/COST/
+!workers/ao/fixtures/DIS/
+!workers/ao/fixtures/SNOW/
