@@ -105,6 +105,19 @@ async def _agreement_stats(session: AsyncSession, company_id: str) -> dict:
             )
         )).scalars().all()
         sources = {p for p in prov if p}
+    eps_gap: dict | None = None
+    if latest.eps_gaap_value is not None and latest.eps_non_gaap_value is not None:
+        gaap = float(latest.eps_gaap_value)
+        non_gaap = float(latest.eps_non_gaap_value)
+        pct_diff: float | None = None
+        if gaap != 0:
+            pct_diff = round(abs(non_gaap - gaap) / abs(gaap) * 100.0, 1)
+        eps_gap = {
+            "gaap_value": round(gaap, 4),
+            "non_gaap_value": round(non_gaap, 4),
+            "pct_diff": pct_diff,
+            "sign_flip": bool(latest.eps_sign_flip),
+        }
     return {
         "has_result": True,
         "period": latest.period,
@@ -114,6 +127,7 @@ async def _agreement_stats(session: AsyncSession, company_id: str) -> dict:
         "conf_tally": tally,
         "metric_count": len(metrics),
         "distinct_sources": len(sources),
+        "eps_gap": eps_gap,
     }
 
 

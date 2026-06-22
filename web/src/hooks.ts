@@ -10,6 +10,7 @@ import type {
   NotificationPrefs,
   PatchDataSourceRequest,
   RoutingRule,
+  UniverseCompany,
   ValidationThresholds,
 } from './types'
 import { DEFAULT_FLAGS, DEFAULT_THRESHOLDS } from './types'
@@ -138,7 +139,15 @@ export const useGuidance = (ticker: string, enabled: boolean) =>
   })
 
 export const useCompanies = () =>
-  useQuery({ queryKey: keys.companies, queryFn: api.getCompanies })
+  useQuery({
+    queryKey: keys.companies,
+    queryFn: api.getCompanies,
+    // While any company has an active pipelineRun, poll every 3s so the
+    // REFRESHING ETA countdown ticks visibly. Otherwise we rely on SSE
+    // invalidation (see useSse) — no background polling.
+    refetchInterval: (q) =>
+      (q.state.data ?? []).some((c) => c.pipelineRun) ? 3000 : false,
+  })
 
 export const useArchivedCompanies = () =>
   useQuery({ queryKey: keys.archivedCompanies, queryFn: api.getArchivedCompanies })
@@ -315,8 +324,55 @@ export const useRunAll = () => {
 export const useDiscover = () =>
   useMutation({ mutationFn: (ticker: string) => api.discover(ticker) })
 
-export const useUniverse = () =>
-  useQuery({ queryKey: keys.universe, queryFn: api.getUniverse, staleTime: 5 * 60_000 })
+/* Persistent S&P 500 universe cache.
+   Add Companies pulls 163 rows + their CDN-hosted logos; on a cold visit the
+   163 image fetches are the long pole. We persist the JSON payload to
+   localStorage so subsequent visits render the grid instantly (survives both
+   browser reload AND server restart since the cache lives in the browser),
+   while React Query refreshes from /universe in the background. Bumped the
+   storage key on the schema change that added `logoUrl`. */
+const UNIVERSE_LS_KEY = 'ao-universe-cache-v1'
+type CachedUniverse = { savedAt: number; data: UniverseCompany[] }
+
+function readUniverseCache(): CachedUniverse | null {
+  try {
+    const raw = localStorage.getItem(UNIVERSE_LS_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || !Array.isArray(parsed.data) || typeof parsed.savedAt !== 'number') {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeUniverseCache(data: UniverseCompany[]) {
+  try {
+    localStorage.setItem(
+      UNIVERSE_LS_KEY,
+      JSON.stringify({ savedAt: Date.now(), data }),
+    )
+  } catch {
+    /* localStorage disabled or full — fall back to in-memory only */
+  }
+}
+
+export const useUniverse = () => {
+  const cached = readUniverseCache()
+  return useQuery({
+    queryKey: keys.universe,
+    queryFn: async () => {
+      const data = await api.getUniverse()
+      writeUniverseCache(data)
+      return data
+    },
+    initialData: cached?.data,
+    initialDataUpdatedAt: cached?.savedAt,
+    staleTime: 5 * 60_000,
+  })
+}
 
 export const useAddCompanies = () => {
   const qc = useQueryClient()

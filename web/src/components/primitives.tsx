@@ -1,6 +1,6 @@
 /* Agent Orange — shared UI primitives, ported from the prototype's
    components.jsx. Pure presentational components; no data fetching here. */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Conf as ConfLevel, Confidence, Provenance } from '../types'
 import { STATUS, type Status } from './status'
@@ -321,12 +321,32 @@ export function ProvenanceItem({ p }: { p: Provenance }) {
   )
 }
 
-/* Ticker glyph (monogram tile) */
-export function Glyph({ ticker, status }: { ticker: string; status: Status }) {
+/* Ticker glyph — renders the real company logo when `logoUrl` is set;
+   falls back to the 2-letter monogram on load error or null URL. */
+export function Glyph({
+  ticker,
+  status,
+  logoUrl,
+}: {
+  ticker: string
+  status: Status
+  logoUrl?: string | null
+}) {
   const s = STATUS[status] || STATUS.watching
+  const [broken, setBroken] = useState(false)
+  const showImg = !!logoUrl && !broken
   return (
     <span className="glyph" style={{ ['--g' as string]: s.dot }}>
-      {ticker.slice(0, 2)}
+      {showImg ? (
+        <img
+          src={logoUrl ?? undefined}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        ticker.slice(0, 2)
+      )}
     </span>
   )
 }

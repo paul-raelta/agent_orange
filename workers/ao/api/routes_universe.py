@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ao.api import schemas as s
 from ao.api.deps import current_user_id, get_db
 from ao.api.serializers import _latest_price
+from ao.data.sp500_logos import LOGO_BY_TICKER
 from ao.data.sp500_seed import SP500_SEED
 from ao.db import models as m
 
@@ -56,5 +57,6 @@ async def get_universe(
             mcap=float(seed["mcap"]),
             earn=seed["earn"], earnDays=int(seed["earnDays"]),
             tracked=cid is not None,
+            logoUrl=LOGO_BY_TICKER.get(ticker),
         ))
     return out

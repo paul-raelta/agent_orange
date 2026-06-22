@@ -223,8 +223,22 @@ export type Company = {
   archivedAt?: string | null
   /* Optional investor-relations URL — used by ir_fetcher when set. */
   irUrl?: string | null
+  /* Real company logo CDN URL (from Finnhub /stock/profile2). Falls back to
+     the 2-letter ticker monogram when null/missing or the image fails to load. */
+  logoUrl?: string | null
   /* Forward guidance — only present when flags.guidance is on. */
   guidance?: GuidanceItem[] | null
+  /* Set while the agent pipeline is running or queued for this company.
+     Drives the REFRESHING / QUEUED indicator on the watchlist card. */
+  pipelineRun?: PipelineRun | null
+}
+
+export type PipelineRunState = 'running' | 'queued'
+
+export type PipelineRun = {
+  state: PipelineRunState
+  startedAt?: string | null
+  etaRemainingSeconds: number
 }
 
 export type ReviewItem = {
@@ -375,6 +389,7 @@ export type UniverseCompany = {
   earn: string          // next-earnings display label, e.g. "Aug 06"
   earnDays: number      // days-from-now until next earnings (sort key)
   tracked: boolean      // already on this user's watchlist
+  logoUrl?: string | null
 }
 
 export type DiscoveryStatus = {

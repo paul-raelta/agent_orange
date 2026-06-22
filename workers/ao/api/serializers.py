@@ -16,13 +16,28 @@ from datetime import datetime, timezone
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ao.agents import pipeline_state
 from ao.api import schemas as s
+from ao.data.sp500_logos import LOGO_BY_TICKER
 from ao.db import models as m
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _build_pipeline_run(user_id: str, ticker: str) -> s.PipelineRun | None:
+    """Surface the in-memory pipeline_state tracker on the wire so the
+    watchlist can show a REFRESHING / QUEUED indicator per card."""
+    info = pipeline_state.status_for(user_id, ticker)
+    if info is None:
+        return None
+    return s.PipelineRun(
+        state=info["state"],  # type: ignore[arg-type]
+        startedAt=info.get("startedAt"),
+        etaRemainingSeconds=int(info.get("etaRemainingSeconds", 0)),
+    )
 
 
 def _today_str() -> str:
@@ -250,6 +265,12 @@ async def serialize_company(
         news=news, insider=insider,
         archivedAt=c.archived_at,
         irUrl=c.ir_url,
+        # Prefer the locally-mirrored PNG under web/public/logos/ over the
+        # external Finnhub URL stored in the DB. Existing rows added before
+        # the mirror existed still have Finnhub URLs in c.logo_url, but the
+        # mirror map wins so the UI loads from our own origin.
+        logoUrl=LOGO_BY_TICKER.get(c.ticker) or c.logo_url,
+        pipelineRun=_build_pipeline_run(c.user_id, c.ticker),
     )
 
 

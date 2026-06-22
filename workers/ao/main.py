@@ -23,22 +23,53 @@ from ao.logging import get_logger, setup_logging
 log = get_logger(__name__)
 
 
+async def _backfill_missing_logos() -> None:
+    """Fill `companies.logo_url` for any row that still has it null.
+
+    Best-effort, runs in the background so the API can serve requests
+    while it works. A Finnhub miss is silently ignored — the UI falls
+    back to the 2-letter monogram for that ticker.
+    """
+    from sqlalchemy import select
+
+    from ao.db import models as m
+    from ao.db.engine import get_sessionmaker
+    from ao.integrations.finnhub_client import company_profile, is_configured
+
+    if not is_configured():
+        return
+    Session = get_sessionmaker()
+    async with Session() as session:
+        rows = (await session.execute(
+            select(m.Company).where(m.Company.logo_url.is_(None))
+        )).scalars().all()
+        if not rows:
+            return
+        log.info("logo.backfill.start", count=len(rows))
+        for company in rows:
+            profile = await company_profile(company.ticker)
+            url = (profile or {}).get("logo") or None
+            if url:
+                company.logo_url = url
+                await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    import asyncio
+
     settings = get_settings()
     setup_logging(settings.log_level)
     ensure_var_dirs()
     log.info("api.startup", port=settings.api_port, db=settings.database_url)
     # Ensure the schema reflects current models — creates any new tables and
     # applies idempotent column adds to existing tables.
-    from ao.db.engine import ensure_schema, get_sessionmaker
-    from ao.db.seed import ensure_demo_anchor
+    from ao.db.engine import ensure_schema
 
     await ensure_schema()
-    # NVDA always exists for the default user — see ensure_demo_anchor docstring.
-    Session = get_sessionmaker()
-    async with Session() as session:
-        await ensure_demo_anchor(session)
+    # Fire-and-forget logo backfill for any pre-existing Company rows. Held
+    # in a local variable so the task isn't garbage-collected mid-flight.
+    backfill_task = asyncio.create_task(_backfill_missing_logos())
     if settings.run_scheduler_in_process and settings.scheduler_mode == "inproc":
         log.info("scheduler.starting_in_api_process")
         # Avoided circular: imported here, not at module top.
@@ -46,6 +77,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
         await start_scheduler()
     yield
+    backfill_task.cancel()
     log.info("api.shutdown")
 
 

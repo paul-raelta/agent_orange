@@ -62,7 +62,7 @@ export function Companies() {
       <Reveal className="cfg-list">
         {companies.map((c) => (
           <div className="cfg-row" key={c.ticker} onClick={() => navigate('/company/' + c.ticker)}>
-            <Glyph ticker={c.ticker} status={c.status} />
+            <Glyph ticker={c.ticker} status={c.status} logoUrl={c.logoUrl} />
             <div className="cfg-id">
               <b>{c.ticker}</b>
               <span>{c.name}</span>
@@ -86,7 +86,7 @@ export function Companies() {
           <div className="cfg-list">
             {archived!.map((c) => (
               <div className="cfg-row archived" key={c.ticker}>
-                <Glyph ticker={c.ticker} status={c.status} />
+                <Glyph ticker={c.ticker} status={c.status} logoUrl={c.logoUrl} />
                 <div className="cfg-id">
                   <b>{c.ticker}</b>
                   <span>{c.name}</span>
@@ -96,11 +96,9 @@ export function Companies() {
                   <Btn kind="ghost" sm onClick={() => handleRestore(c.ticker)} disabled={restore.isPending}>
                     RESTORE
                   </Btn>
-                  {c.ticker !== 'NVDA' && (
-                    <Btn kind="danger" sm onClick={() => handleDelete(c.ticker)} disabled={del.isPending}>
-                      {del.isPending ? 'DELETING…' : 'PERMANENTLY DELETE'}
-                    </Btn>
-                  )}
+                  <Btn kind="danger" sm onClick={() => handleDelete(c.ticker)} disabled={del.isPending}>
+                    {del.isPending ? 'DELETING…' : 'PERMANENTLY DELETE'}
+                  </Btn>
                 </div>
               </div>
             ))}

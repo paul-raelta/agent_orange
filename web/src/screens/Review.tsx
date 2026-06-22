@@ -5,15 +5,18 @@ import { useNavigate } from 'react-router-dom'
 import { Btn, Conf, Glyph, Panel, ProvenanceItem } from '../components/primitives'
 import { Loading } from '../components/Loading'
 import { Reveal } from '../motion/motion'
-import { useFeatureFlags, useResolveReview, useReviewQueue } from '../hooks'
+import { useCompanies, useFeatureFlags, useResolveReview, useReviewQueue } from '../hooks'
 import type { ConflictSourceId, ReviewConflict, ReviewItem as ReviewItemT } from '../types'
 
 export function Review() {
   const { data: items } = useReviewQueue()
+  const { data: companies } = useCompanies()
   const navigate = useNavigate()
   const resolveMutation = useResolveReview()
   const { flags } = useFeatureFlags()
   const [resolved, setResolved] = useState<Record<string, string>>({})
+  const logoByTicker: Record<string, string | null | undefined> = {}
+  for (const c of companies ?? []) logoByTicker[c.ticker] = c.logoUrl
 
   if (!items) return <Loading title="REVIEW QUEUE" />
 
@@ -59,6 +62,7 @@ export function Review() {
                 key={it.id}
                 item={it}
                 conflict={it.conflict}
+                logoUrl={logoByTicker[it.ticker]}
                 onResolve={(choice, extras) => resolve(it.id, choice, extras)}
               />
             )
@@ -123,10 +127,12 @@ export function Review() {
 function ConflictWorkspaceItem({
   item,
   conflict,
+  logoUrl,
   onResolve,
 }: {
   item: ReviewItemT
   conflict: ReviewConflict
+  logoUrl?: string | null
   onResolve: (
     choice: string,
     extras: { note?: string; pinnedValue?: string },
@@ -141,7 +147,7 @@ function ConflictWorkspaceItem({
   return (
     <div className="cw">
       <div className="cw-hd">
-        <Glyph ticker={item.ticker} status="review" />
+        <Glyph ticker={item.ticker} status="review" logoUrl={logoUrl} />
         <div className="cw-hd-id">
           <div className="cw-hd-tkr">
             {item.ticker} · {conflict.metric}

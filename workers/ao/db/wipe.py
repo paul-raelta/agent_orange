@@ -16,7 +16,6 @@ from sqlalchemy import delete
 
 from ao.db import models as m
 from ao.db.engine import create_all, get_engine, get_sessionmaker
-from ao.db.seed import ensure_demo_anchor
 from ao.logging import get_logger, setup_logging
 
 log = get_logger(__name__)
@@ -48,7 +47,5 @@ async def wipe() -> None:
             await session.execute(delete(model))
 
         await session.commit()
-        # Restore NVDA after wipe — it's the demo anchor; can't go missing.
-        await ensure_demo_anchor(session)
     await get_engine().dispose()
     log.info("wipe.done")

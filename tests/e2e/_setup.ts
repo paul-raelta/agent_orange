@@ -2,11 +2,14 @@ import { APIRequestContext, expect } from '@playwright/test'
 
 export const API_BASE = 'http://127.0.0.1:8000/api/v1'
 
-// Reset to a known baseline. wipe() restores NVDA via ensure_demo_anchor —
-// every other ticker, review row, news row, etc. is gone.
+// Reset to a known baseline. wipe() now empties the watchlist completely
+// (the NVDA demo-anchor auto-restore was removed). For specs that assume an
+// NVDA row exists, this helper re-adds it via the same batch path real users
+// take — CIK is resolved from SEC's public ticker map.
 export async function wipeDb(request: APIRequestContext): Promise<void> {
   const res = await request.post(`${API_BASE}/admin/wipe`)
   expect(res.ok(), `wipe failed: ${res.status()}`).toBeTruthy()
+  await addCompany(request, 'NVDA')
 }
 
 // Fast non-UI seed of a tracked ticker via the batch endpoint, so specs that

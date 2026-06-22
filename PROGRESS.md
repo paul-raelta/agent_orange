@@ -1366,3 +1366,649 @@ the pipeline against NVDA and inspect the next `agent_runs` row tagged
 `validation` — the system prompt sent (logged in `model` / `prompt_version`
 trace, if surfaced) should reflect the new bands. Click DEFAULTS → fields
 revert to `0.001 / 0.1 / 1.0`; SAVE re-enables.
+
+---
+
+## Increment — CIK resolution in Add Companies + remove NVDA demo anchor
+
+**Goal:** the realistic real-data demo flow. Click "wipe everything" → truly
+empty watchlist (today it restored NVDA). Add any S&P 500 ticker via Add
+Companies → backend resolves a real SEC CIK from SEC's public ticker map →
+the EDGAR pipeline fires for that ticker on RUN ALL AGENTS → real
+confidence outcomes emerge. Replaces the "NVDA-always-present demo anchor"
+posture from the previous increment.
+
+**What landed**
+- **New module:** `workers/ao/integrations/cik_resolver.py`. `resolve_cik(ticker)`
+  pulls SEC's `https://www.sec.gov/files/company_tickers.json` (~150 KB,
+  every exchange-listed ticker→CIK pair) on first call, parses to an
+  in-memory dict, and caches the raw JSON to
+  `workers/var/cache/company_tickers.json` with a 24h TTL. Reuses the
+  polite User-Agent (`config.edgar_user_agent`) and the same `httpx.AsyncClient`
+  pattern `edgar_client.py` uses. Returns zero-padded 10-digit string or
+  `None` (OTC/ADR/transient fetch failure → row is still persisted, pipeline
+  no-ops cleanly).
+- **Wired into `POST /companies/batch`** (`workers/ao/api/routes_companies.py`)
+  — after looking up name/sector/seed price from `sp500_seed`, also resolves
+  CIK and writes it to `Company.cik`. The SEC `Source` row label becomes
+  `EDGAR · CIK 0000909832` (was `EDGAR · search "COST"`). Unresolved tickers
+  log `cik.unresolved` but still persist.
+- **NVDA demo anchor removed everywhere:**
+  - `workers/ao/main.py` lifespan — dropped the `ensure_demo_anchor()` call;
+    only `ensure_schema()` remains on startup.
+  - `workers/ao/db/wipe.py` — dropped the post-wipe NVDA restore. Wipe is
+    now fully destructive.
+  - `workers/ao/api/routes_companies.py::delete_company` — dropped the 409
+    refusal on `DELETE /companies/NVDA`. Hard-delete works for any archived
+    company.
+  - `web/src/screens/Companies.tsx` — dropped the special-case hiding of
+    the PERMANENTLY DELETE button on NVDA's archived row.
+  - `ensure_demo_anchor()` kept in `db/seed.py` as a function for the
+    `python -m ao.db.seed` CLI; just not auto-called anywhere.
+- **Examiner overlay graceful empty-playlist:** `web/public/agent-run/examiner.js`
+  — when the watchlist has no fixture-equipped tickers (NVDA/SNDK/MU not
+  present), no longer falls back to playing NVDA's fixture chapter. Runs
+  background-rail only with subtitle "scanning watchlist · N companies"
+  and summary "Refreshed quotes + news + insider for N companies (…)".
+  Behavior unchanged when fixture tickers are on the list.
+- **SNOW added to the SP500 grid:** `workers/ao/data/sp500_seed.py` +
+  `web/src/data/sp500.ts` — Snowflake (Information Technology, $210, mcap
+  $68B). Total roster now 163 rows. SNOW is required for the LOW-confidence
+  demo path and wasn't in the static roster before.
+- **Tests:** `tests/e2e/_setup.ts` — `wipeDb` now follows the wipe with
+  `addCompany('NVDA')` via the batch endpoint so existing specs that assume
+  an NVDA row continue to work. CIK is resolved live; the produced row is
+  functionally equivalent to the old demo-anchor row.
+
+**Verification done**
+- `npm run build` (web) — green, 110 modules.
+- `python -c "from ao.main import app"` — green, 49 routes.
+- CIK resolver smoke (live SEC fetch): NVDA → `0001045810`, COST →
+  `0000909832`, DIS → `0001744489`, SNOW → `0001640147`, gibberish → None.
+- ASGI in-process smoke: `POST /companies/batch {tickers:["COST","DIS","SNOW"]}`
+  → 200, three rows persisted with correct CIKs. SSE `company.updated`
+  fires per ticker. `wipe()` after add → 0 companies remain (no NVDA
+  auto-restore).
+- Playwright e2e suite — running.
+
+**Decisions baked in**
+- Per-user CIK cache is intentionally process-global (module-level dict +
+  shared on-disk file). The map is the same for every user and is public
+  data; no point per-user.
+- Discovery (`POST /companies` stub) is unchanged — CIK is resolved by the
+  batch endpoint, not surfaced through the discovery rail. Could be added
+  later to display "✓ CIK 0000909832 found" in the discovery card.
+- SP500_SEED's `tracked` field stays advisory only — the universe overlay
+  reads from the DB. SP500 changes don't bring any company into the live
+  watchlist.
+- Demo tickers (researched, evidence verified against Q1/Q2 2026 filings):
+  - 🟢 COST (Costco) — clean GAAP only, EPS $4.93 +15.2% YoY, expected
+    HIGH confidence (~75-90%).
+  - 🟡 DIS (Disney) — moderate GAAP/adjusted gap ($1.34/$1.63), down YoY
+    with stock falling, expected MEDIUM (~45-65%).
+  - 🔴 SNOW (Snowflake) — catastrophic GAAP −$0.90 vs non-GAAP +$0.39
+    (sign flip), validation rule fires deterministically, expected LOW
+    (~20-38%) plus a review-queue row.
+
+**Files touched**
+- `workers/ao/integrations/cik_resolver.py` (new)
+- `workers/ao/api/routes_companies.py` — resolve CIK on batch add; drop
+  NVDA delete guard.
+- `workers/ao/main.py` — drop `ensure_demo_anchor` from lifespan.
+- `workers/ao/db/wipe.py` — drop post-wipe `ensure_demo_anchor`.
+- `workers/ao/data/sp500_seed.py` — SNOW added.
+- `web/public/agent-run/examiner.js` — background-only mode for empty
+  fixture playlist.
+- `web/src/screens/Companies.tsx` — drop NVDA-specific delete hide.
+- `web/src/data/sp500.ts` — SNOW added.
+- `tests/e2e/_setup.ts` — re-add NVDA after wipe for back-compat.
+
+**Next step**
+Visual QA (the user-described "real use" flow):
+1. `/settings` → FIRST-TIME EXPERIENCE → confirm RESET. Reload `/`. The
+   watchlist is empty (only the empty state). `/companies` shows zero
+   active and zero archived.
+2. `/companies` → ADD COMPANIES → search COST, DIS, SNOW → select each →
+   ADD → discovery rail completes → START WATCHING ALL.
+3. Confirm `sqlite3 workers/var/ao.db "SELECT ticker, cik FROM companies;"`
+   returns the three rows with `0000909832`, `0001744489`, `0001640147`.
+4. RUN ALL AGENTS → overlay plays the background-rail (no faked NVDA
+   chapter). Behind the scenes EDGAR fetch → extraction → validation →
+   confidence runs against real Anthropic for all three. Allow ~30-60s
+   for the full pipeline.
+5. Reload `/`. Three cards with distinct gauges:
+   - COST: green ring, ~75-90% (HIGH band)
+   - DIS: amber ring, ~45-65% (MEDIUM)
+   - SNOW: red ring, ~20-38% (LOW), status `review`; `/review` shows a row
+     with $-0.90 vs $0.39 candidates.
+
+---
+
+## Increment — REFRESHING / QUEUED indicator on watchlist cards
+
+**Goal:** the agent pipeline takes ~75 s per company (EDGAR fetch +
+extraction + validation + narrative + confidence), and runs serially for
+RUN ALL AGENTS. Today the cards don't change until each company's pipeline
+fully commits, so the user is staring at unchanged cards for minutes with
+no signal that work is happening. Need an on-card REFRESHING pill with a
+rough ETA so the wait is legible.
+
+**What landed**
+- **New module:** `workers/ao/agents/pipeline_state.py` — in-memory tracker
+  with two module-level dicts (`_running`, `_queue`). Functions
+  `queue_tickers(user_id, tickers)`, `mark_started(user_id, ticker)`,
+  `mark_finished(user_id, ticker)`, `status_for(user_id, ticker)`.
+  Process-local, intentional — fine for v1 single-process deploy. Survives
+  no restarts, which is correct (any in-flight pipeline was killed too).
+  Default per-ticker budget: 75 s.
+- **`workers/ao/api/routes_run.py`:**
+  - `_bg_run` now wraps the pipeline body in `mark_started/mark_finished`
+    so the state flips correctly even on exceptions.
+  - `POST /run` (RUN ALL AGENTS) synchronously loads tickers + calls
+    `pipeline_state.queue_tickers` BEFORE returning, so the frontend's
+    onSuccess refetch immediately sees `pipelineRun: {state: "queued"}` on
+    every card. Otherwise the BackgroundTasks would race the refetch.
+  - `POST /companies/{ticker}/run` same: queues synchronously.
+  - `_bg_run_all` keeps a defensive `queue_tickers` call (idempotent).
+- **Wire schema** (`workers/ao/api/schemas.py`): new `PipelineRun`
+  `{state: "running" | "queued", startedAt?: str, etaRemainingSeconds: int}`.
+  Optional field on `Company`.
+- **Serializer** (`workers/ao/api/serializers.py::_build_pipeline_run`):
+  reads `pipeline_state.status_for(user_id, ticker)` and serializes.
+- **Frontend:**
+  - `web/src/types.ts` mirrors `PipelineRun`.
+  - `web/src/screens/Watchlist.tsx` renders a `<PipelineBadge>` in
+    `.wl-card-top-right` whenever `c.pipelineRun` is non-null. Format
+    "REFRESHING · ~45s" (orange, pulsing dot) or "QUEUED · ~2m" (gray).
+    Compact `fmtEta()` switches `Ns` ↔ `Nm` at the 60 s boundary.
+  - `web/src/styles/app.css` — `.wl-pipeline-pill` + `.queued` variant.
+  - `web/src/hooks.ts::useCompanies` — `refetchInterval: 3000` while any
+    company has `pipelineRun`, otherwise off. ETA naturally counts down on
+    the server side as elapsed grows.
+
+**Decisions baked in**
+- Tracker is in-memory module-level state. No DB schema change. Trades
+  durability for simplicity — multi-process deploys would need a small DB
+  table or Redis here, but the user is on the single-process posture.
+- The queue is per-user FIFO. Pipelines run serially. So all queued cards
+  show ETAs stacked behind the running one (running ETA + position × 75 s).
+- The route handler does the synchronous queue, not `_bg_run_all`. Eliminates
+  the race window where the frontend's first refetch would see no state.
+- `etaRemainingSeconds` clamps to 0 — never goes negative. The card shows
+  "FINISHING…" in that case until the pipeline actually completes and the
+  badge disappears.
+- 75 s budget is a back-of-envelope (monitoring ~5 s + extraction ~30-45 s +
+  validation ~10 s + narrative ~5 s + confidence ~10-15 s). Tune later if
+  the actual distribution lands far off.
+- Adaptive polling sits beside the existing SSE invalidation — not a
+  replacement. SSE still fires `company.updated` on each stage commit.
+
+**Verification done**
+- `python -c "from ao.main import app"` — green, 49 routes.
+- `npm run build` (web) — green, 110 modules.
+- `pipeline_state` unit smoke: queue 3 tickers; first running shows 75 s ETA;
+  queued #2 shows 75 s; queued #3 shows 150 s; 2 s wait → all decrement
+  correctly; finish #1 + start #2 → roles cycle.
+- ASGI in-process smoke: `POST /companies/batch {tickers:["COST","DIS","SNOW"]}`,
+  then `pipeline_state.queue_tickers + mark_started` for COST, then
+  `GET /companies` → COST `running` (startedAt + 75 s ETA), DIS `queued` 75 s,
+  SNOW `queued` 150 s.
+- Playwright e2e — running.
+
+**Files touched**
+- `workers/ao/agents/pipeline_state.py` (new)
+- `workers/ao/api/routes_run.py` — mark in _bg_run; synchronous queue in
+  POST /run and POST /companies/{ticker}/run.
+- `workers/ao/api/schemas.py` — `PipelineRun` + `Company.pipelineRun`.
+- `workers/ao/api/serializers.py` — `_build_pipeline_run`.
+- `web/src/types.ts` — `PipelineRun`.
+- `web/src/screens/Watchlist.tsx` — `<PipelineBadge>` + `fmtEta`.
+- `web/src/styles/app.css` — `.wl-pipeline-pill`.
+- `web/src/hooks.ts` — `refetchInterval` driven by `pipelineRun` presence.
+
+**Next step**
+Live test: wipe → add COST/DIS/SNOW → RUN ALL AGENTS. Expected sequence:
+1. All three cards show a gray QUEUED pill within ~1 second of clicking.
+   ETAs stack: ~1m / ~2m / ~3m.
+2. As the data-refresh phase finishes, COST's pill flips to orange
+   REFRESHING with a 75 s countdown.
+3. Card data updates (price, confidence gauge, narrative) when COST's
+   pipeline commits each stage.
+4. COST's pill disappears. DIS flips to REFRESHING. SNOW remains QUEUED
+   with ~1 m ETA.
+5. Continues serially until all three pills are gone.
+
+---
+
+## Increment — Demo polish: multi-recipient notifs · unsupported notice · Recommended row
+
+**Goal:** three small surfaces to make demos and exploration smoother.
+
+**What landed**
+- **Multi-recipient SMS / email.** `workers/ao/notify/dispatcher.py` —
+  added `_split_recipients(s)` (comma-separated, trim, drop empties) and
+  changed the dispatch tail to loop over the parsed list, wrapping each
+  send in try/except so one bad address logs `notify.email.send_failed`
+  / `notify.sms.send_failed` and the rest still go out. DB schema
+  unchanged — `NotificationPref.email` / `phone` remain single TEXT
+  columns; the comma-list lives inside that one string. Settings panel
+  (`web/src/screens/Settings.tsx`) — email input dropped to `type="text"`
+  (HTML5 `email` rejects commas), both fields gained multi-recipient
+  placeholders + a `comma-separate multiple recipients` hint line.
+- **"Company not yet supported" notice on watchlist cards.** New
+  `web/src/data/supported.ts` exports `SUPPORTED_TICKERS = {NVDA, SNDK,
+  MU, COST, DIS, SNOW}` + `isSupported(ticker)`. In
+  `web/src/screens/Watchlist.tsx::CompanyCard`, when `!isSupported`,
+  the metrics grid + period block + footer collapse into a single
+  dashed-bordered notice block ("Company not yet supported — Detailed
+  extraction and confidence coverage will land in a future release.").
+  Top-right badges, price row, and position block stay intact. New
+  `.wl-unsupported` class added to `web/src/styles/app.css`.
+- **Recommended section on Add Companies.** Same `SUPPORTED_TICKERS`
+  constant feeds a pinned `.ac-group` at the top of the browse-grid view
+  in `web/src/screens/AddCompanies.tsx`. Header reads
+  `Recommended · 6 cos · quick access · full data coverage`. Always
+  shows all six cards in grid view (ignores search / sector chip);
+  sector groups below still filter as before. Tickers also remain in
+  their normal sector group below — the recommended row is additive.
+
+**Decisions baked in**
+- DB unchanged. The comma-list lives inside a single TEXT column. Lower
+  friction than introducing a JSON array; trivial to parse at dispatch
+  time.
+- Per-recipient try/except in the dispatcher loop. One malformed
+  address shouldn't abort delivery to valid ones.
+- Supported-ticker allowlist is a frontend-only concept. The backend
+  still runs the pipeline for any ticker; the notice only governs
+  what's shown on the watchlist card.
+- `SUPPORTED_TICKERS` is the single source of truth; same constant
+  feeds both surfaces (watchlist notice + Recommended row) so the demo
+  set is defined in exactly one place.
+- Recommended row pinned to grid view only (table view is itself a
+  full-density browse mode; no quick-access bar needed). Ignores
+  search/sector chips by design — it's a fixed shortcut, not a filtered
+  subset.
+
+**Verification done**
+- `npm run build` → tsc clean, vite built, 111 modules (was 110), 63.0
+  KB CSS.
+- `python -c "from ao.main import app"` → 49 routes (unchanged).
+- `_split_recipients` unit smoke: `"a@x.com, b@x.com ,,  c@x.com"` →
+  `["a@x.com", "b@x.com", "c@x.com"]`; `""` → `[]`.
+
+**Files touched**
+- `workers/ao/notify/dispatcher.py` — `_split_recipients` + per-
+  recipient send loops.
+- `web/src/screens/Settings.tsx` — NOTIFICATIONS field types / labels /
+  hints.
+- `web/src/data/supported.ts` *(new)* — `SUPPORTED_TICKERS` +
+  `isSupported`.
+- `web/src/screens/Watchlist.tsx` — unsupported-card branch.
+- `web/src/screens/AddCompanies.tsx` — `recommended` memo + pinned
+  `.ac-group` above sector groups.
+- `web/src/styles/app.css` — `.wl-unsupported`, `.wl-unsupported-dot`,
+  `.wl-unsupported-copy`, `.wl-unsupported-title`, `.wl-unsupported-sub`.
+
+**Next step**
+Visual QA:
+1. `/settings` → NOTIFICATIONS: enter `a@example.com, b@example.com`
+   in EMAIL ADDRESSES and `+353123, +1555` in PHONE NUMBERS, SAVE.
+   Trigger a `validated` event and confirm both recipients receive.
+2. `/` after `wipe` + `add WMT`: card shows price + position + the
+   "Company not yet supported" notice. Add `COST`: full card.
+3. `/companies` → ADD COMPANIES: top of grid shows
+   `Recommended · 6 cos` with NVDA, SNDK, MU, COST, DIS, SNOW. Typing
+   in search and clicking sector chips leaves the recommended row
+   untouched; sector groups below filter normally.
+
+---
+
+## Increment — Company-card explainability tooltips + period="?" root-cause fix
+
+**Goal:** users couldn't tell what the BEAT/MISS badge or the CONS/SURP
+columns meant, and the "LATEST" row on the watchlist card often showed
+`?` for the reporting period. Add hover tooltips for the first two; fix
+the `?` at the source instead of papering over it in the UI.
+
+**What changed**
+- `web/src/screens/Watchlist.tsx` — `BeatBadge` gets a `title` explaining
+  the avg-surprise-% threshold rule (>+0.5% beat, <−0.5% miss, else in
+  line).
+- `web/src/screens/Company.tsx` — same tooltip pattern on
+  `ConsensusBanner` (EPS-only wording) and on the `CONS` / `SURP`
+  `<th>` headers in the results table.
+- `web/src/components/primitives.tsx` already uses the same native
+  `title=""` pattern, so no new tooltip component / CSS needed.
+- `workers/ao/agents/monitoring.py` — root cause of `period="?"` was
+  that the monitor never read EDGAR's `periodOfReport` field. Now:
+  - extracts `recent.get("periodOfReport", [])` alongside form /
+    accession / filingDate;
+  - new `_derive_period_label(form_type, period_of_report_iso)` →
+    `"FY2025"` for 10-Ks, `"Q3 2025"` for 10-Qs / 8-Ks, falls back to
+    the form name (e.g. `"8-K"`) when EDGAR omits the period;
+  - Filing row now sets `period=…label…` and
+    `period_end=period_of_report or filing_date` (period_end was
+    incorrectly the filing date before — should be the period-end
+    date).
+  - The `or "?"` fallbacks in `agents/pipeline.py:102,149` stay as
+    belt-and-braces but should never fire in practice.
+
+**Decisions baked in**
+- Native HTML `title=""` over a custom tooltip component — matches the
+  existing pattern, zero CSS overhead.
+- No DB migration / backfill. The wipe-and-rehydrate flow ([[feedback_
+  no_demo_anchor]]) clears stale `period="?"` rows; the next monitoring
+  poll writes the proper label.
+- Tooltip wording describes what the column *means*, not the current
+  stub implementation status of `consensus_provider.py`.
+
+**Verification (visual QA TBD)**
+1. Dev server → Watchlist → hover BEAT/MISS pill → tooltip describes
+   threshold rule. Open a company → hover headline BEAT pill + CONS /
+   SURP column headers → all three tooltips appear.
+2. Wipe DB, add a supported S&P-500 ticker, let monitoring run once →
+   `LATEST` reads e.g. `Q3 2025 ended 2025-09-30`, never `?`.
+3. Add a ticker whose latest filing is an 8-K with no `periodOfReport`
+   in EDGAR → label falls back to `"8-K"` instead of `?`.
+
+**Files touched**
+- `web/src/screens/Watchlist.tsx`
+- `web/src/screens/Company.tsx`
+- `workers/ao/agents/monitoring.py`
+
+**Next step**
+Visual QA per the three points above, then commit.
+
+---
+
+## Increment — Real company logos everywhere in the UI
+
+**Goal:** swap the 2-letter ticker monogram for real CDN-hosted company
+logos in every place the UI renders a company (Watchlist, Companies,
+Company deep-dive, Review queue, Filing Timeline, Add Companies browse
+grid, and the Agent Run examiner overlay), without losing the existing
+monogram as a graceful fallback.
+
+**What landed**
+- Backend
+  - `Company.logo_url` column (`workers/ao/db/models.py`); idempotent
+    migration via `engine.py:_COLUMN_MIGRATIONS`.
+  - `Company.logoUrl` on the wire (`api/schemas.py`,
+    `api/serializers.py`); `UniverseCompany.logoUrl` likewise.
+  - `finnhub_client.company_profile(symbol)` — wraps
+    `/stock/profile2`. Called inside `POST /companies/batch` right after
+    `resolve_cik`, persists the returned `logo` URL. Best-effort: a
+    failed fetch leaves `logo_url=None`, UI shows monogram.
+  - Lifespan startup (`main.py`) fires a background task that fills
+    `logo_url` for any pre-existing Company row where it is null.
+- Universe seed
+  - `workers/ao/data/sp500_logos.py` (new) — `LOGO_BY_TICKER` map keyed
+    by S&P 500 ticker. Generated by `workers/scripts/seed_logos.py`
+    (new) which iterates `SP500_SEED` and calls
+    `finnhub_client.company_profile`. Re-run on roster changes.
+  - First run resolved 153/163 tickers.
+  - `routes_universe.py` emits `logoUrl` per row.
+- Frontend
+  - `Glyph` (`web/src/components/primitives.tsx`) and `MonoGlyph`
+    (`AddCompanies.tsx`) take an optional `logoUrl`; render an
+    `<img loading="lazy">` and fall back to the 2-letter monogram on
+    error or null URL.
+  - CSS (`web/src/styles/app.css`) — `.glyph img` and `.ac-glyph img`
+    keep the 34×34 tile, white background reads cleanly against the
+    panel surface, status-accent bar (the `::after`) stays visible.
+  - `Company.logoUrl` + `UniverseCompany.logoUrl` added to `types.ts`.
+  - Threaded `logoUrl` through every call site: Watchlist, Companies
+    (active + archived), Company deep-dive, Review (looked up from
+    `useCompanies`), Timeline (both desktop + mobile lanes),
+    AddCompanies (grid + discovery confirmation row).
+- Examiner overlay
+  - `AgentRun.start(...)` widened to also accept
+    `{ticker, logoUrl}[]`; signature kept back-compat with
+    `string | string[]`.
+  - `AppShell.runAll()` passes
+    `companies.map(c => ({ticker, logoUrl}))`.
+  - `examiner.js` renders a small `<img>` in the brand subtitle next to
+    `examining <ticker> filings · …` and inside each background-rail
+    pill. `examiner.css` adds `.rc-sub-logo` (16×16) and `.rc-bg-logo`
+    (14×14).
+
+**Decisions baked in**
+- **URL only, no local mirroring.** Browser fetches images directly
+  from `static.finnhub.io`. Simple; survives wipes. Re-introducing
+  local mirroring later only needs a `safe_fetch` + storage swap inside
+  `_backfill_missing_logos`.
+- **Finnhub `/stock/profile2` as source of truth.** Already-integrated
+  provider, no new keys. 10 of 163 SP500 tickers came back with no
+  logo (e.g. T, F, V) — fallback monogram covers those silently. The
+  same lookup path runs in the batch-add and in the lifespan backfill.
+- **Eager universe seed.** Opening Add Companies must not trigger 153
+  external calls; the seed file ships the mapping. `seed_logos.py` is
+  one-shot, re-run when the roster changes.
+- **Single chokepoint.** Both `Glyph` and `MonoGlyph` swap the same
+  way (img-on-success, monogram-on-error) — adding new screens later
+  needs no new fallback logic.
+
+**Verification done**
+- Backend: `python -c "from ao.main import app"` — 49 routes (was 46).
+- Frontend: `npm run build` → tsc clean, 111 modules transformed (was
+  107), 63.26 KB CSS gz 11.87 KB. No new bundle.
+- In-process ASGI smoke (`AsyncClient` against `app`):
+  - `GET /api/v1/universe` → 163 rows, 153 carry `logoUrl`; `AAPL` row
+    returns
+    `https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/AAPL.png`.
+  - `POST /api/v1/companies/batch {tickers:["AAPL"]}` returns the new
+    row with `logoUrl` populated; SSE `company.updated` fires.
+- `ensure_schema()` ran successfully — `PRAGMA table_info(companies)`
+  on the live SQLite shows `logo_url` in the column list.
+
+**Files touched**
+- `workers/ao/db/models.py` — `Company.logo_url`.
+- `workers/ao/db/engine.py` — `_COLUMN_MIGRATIONS` row.
+- `workers/ao/api/schemas.py` — `Company.logoUrl`, `UniverseCompany.logoUrl`.
+- `workers/ao/api/serializers.py` — emit `logoUrl`.
+- `workers/ao/integrations/finnhub_client.py` — `company_profile()`.
+- `workers/ao/api/routes_companies.py` — fetch profile2 in batch-add.
+- `workers/ao/api/routes_universe.py` — emit `logoUrl` from
+  `LOGO_BY_TICKER`.
+- `workers/ao/data/sp500_logos.py` (new).
+- `workers/scripts/seed_logos.py` (new).
+- `workers/ao/main.py` — `_backfill_missing_logos` task in lifespan.
+- `web/src/components/primitives.tsx` — `Glyph` renders img + fallback.
+- `web/src/screens/AddCompanies.tsx` — `MonoGlyph` renders img +
+  fallback; threaded `logoUrl` at both call sites.
+- `web/src/types.ts` — `Company.logoUrl`, `UniverseCompany.logoUrl`.
+- `web/src/screens/{Watchlist,Companies,Company,Review,Timeline}.tsx`
+  — threaded `logoUrl` through to `Glyph`.
+- `web/src/styles/app.css` — `.glyph img`, `.ac-glyph img`.
+- `web/src/layout/AppShell.tsx` — pass `{ticker,logoUrl}[]` to
+  `AgentRun.start`.
+- `web/public/agent-run/examiner.js` — widened `start()` signature,
+  `logoByTicker` map, `<img>` in brand subtitle + background-rail pills.
+- `web/public/agent-run/examiner.css` — `.rc-sub-logo`, `.rc-bg-logo`.
+
+**Next step**
+Visual QA in the browser:
+1. `/` Watchlist — every card glyph is a real logo; brokenness gracefully
+   falls back to the 2-letter monogram for any non-Finnhub ticker (e.g.
+   T, F, V, MO).
+2. `/companies` (active + ARCHIVED panel) — same.
+3. `/company/NVDA` (or AAPL) — deep-dive header shows the real logo.
+4. `/timeline` — desktop Gantt lanes + mobile agenda cards both show
+   logos.
+5. `/companies` → ADD COMPANIES — every tile in the browse grid shows
+   a real logo (10 SP500 tickers are missing and stay as monograms).
+6. RUN ALL AGENTS — examiner brand subtitle gains the per-ticker logo,
+   background-rail pills each show a tiny logo on the left.
+
+Note: a one-row AAPL company exists in the local DB from the in-process
+batch-add smoke test. Either archive it from `/companies` or use the
+Settings → FIRST-TIME EXPERIENCE wipe if you want a clean watchlist
+again.
+
+---
+
+## Increment — Spread demo confidence scores + put SNOW into review
+
+**Problem (user-reported):** COST, DIS, SNOW all landed in the 60–70%
+band on the watchlist and none of them needed validation. The demo set
+was meant to show HIGH / MEDIUM / LOW with SNOW landing in the review
+queue.
+
+**Root cause:** the extraction prompt was hardcoded to pull GAAP-only
+EPS ("EPS · diluted — diluted earnings per share, GAAP"). SNOW's
+non-GAAP +$0.39 vs its GAAP −$0.90 sign-flip therefore never reached
+validation, so `validation_conflict` never fired, no review row was
+created, and the confidence agent saw near-identical inputs for all
+three.
+
+**Design choice (confirmed with user via AskUserQuestion):**
+- Conflict rule: sign-flip OR >50% magnitude gap. Routine same-sign
+  adjusted gaps (DIS at $1.34 / $1.63) are NOT conflicts; the sign-flip
+  (SNOW) IS.
+- Spread: match PROGRESS targets — COST ~80%, DIS ~55%, SNOW ~30%.
+  Achieved by surfacing the `eps_gap` magnitude into the confidence
+  agent's inputs and giving the prompt explicit target bands per case.
+
+**What landed**
+- **Extraction prompt** (`workers/ao/agents/prompts.py`,
+  `PROMPT_VERSION_EXTRACTION v1→v2`): for EPS metrics, extract BOTH
+  the GAAP figure (income statement) AND any adjusted / non-GAAP
+  figure (reconciliation, MD&A, press-release exhibit) when present;
+  tag each location's `source_label` to make the distinction explicit
+  ("Income statement (GAAP)" vs "Non-GAAP reconciliation" /
+  "Adjusted EPS · MD&A"). GAAP-only filings still extract just the
+  GAAP value.
+- **Validation prompt** (`PROMPT_VERSION_VALIDATION v2→v3`): GAAP vs
+  non-GAAP EPS only conflicts on opposite signs OR magnitude >50% of
+  |GAAP|. Routine same-sign gaps record at `conf="med"` with no
+  conflict flag.
+- **Result columns** (`workers/ao/db/models.py`, `db/engine.py`): new
+  `eps_gaap_value`, `eps_non_gaap_value`, `eps_sign_flip` columns on
+  `results`. Added to `_COLUMN_MIGRATIONS` so existing DBs self-heal
+  on next startup.
+- **Pipeline** (`workers/ao/agents/pipeline.py`): new
+  `_classify_eps_label()` + `_eps_gap()` helpers derive the
+  GAAP/non-GAAP pair from extracted locations (tag-based, with a
+  fallback that treats untagged labels as GAAP). The triple is
+  persisted on the Result row alongside the validation outcome.
+- **Confidence** (`workers/ao/agents/confidence.py`,
+  `PROMPT_VERSION_CONFIDENCE v1→v2`): `_agreement_stats` now includes
+  an `eps_gap` dict (`{gaap_value, non_gaap_value, pct_diff,
+  sign_flip}` — null when the latest filing is GAAP-only). The
+  CONFIDENCE_SYSTEM prompt has explicit target bands:
+    - `eps_gap=null` → target ≥75%
+    - `sign_flip=true` → target 20-40%
+    - `sign_flip=false, pct_diff>50` → target 35-55%
+    - `sign_flip=false, pct_diff≤50` → target 45-65%
+  The LLM still weighs the other three factors; the EPS-gap target is
+  the dominant lever.
+
+**Verification done**
+- `python -c "from ao.main import app"` → 49 routes (unchanged).
+- `npm run build` (web) → tsc clean, 111 modules, 63.26 KB CSS.
+- `ensure_schema()` ALTER added `eps_gaap_value`, `eps_non_gaap_value`,
+  `eps_sign_flip` (REAL / REAL / INTEGER) to `results` on the live
+  SQLite.
+- `_eps_gap()` unit smoke:
+  - COST-like (single GAAP location) → `(4.93, None, False)`
+  - DIS-like (GAAP $1.34 + adjusted $1.63) → `(1.34, 1.63, False)`
+  - SNOW-like (GAAP −$0.90 + non-GAAP +$0.39) → `(-0.9, 0.39, True)`
+  - Legacy untagged → first location treated as GAAP; no gap.
+- `_classify_eps_label`: GAAP / non-GAAP / adjusted / unknown all
+  classified correctly.
+
+**Decisions baked in**
+- Source-label tagging (not a separate metric key) for non-GAAP. The
+  validator already sees both values under "EPS · diluted" so the
+  conflict path it already had still fires.
+- The 50% threshold + sign-flip are the only conflict triggers; the
+  validation prompt is explicit so the LLM stays deterministic.
+- The eps_gap fields are deterministic (computed in `pipeline.py`);
+  the confidence LLM only weighs and explains.
+- Did NOT add a deterministic floor/cap on `overall_pct` — the prompt
+  target bands carry the spread. Revisit if real-run scores drift.
+
+**Files touched**
+- `workers/ao/agents/prompts.py` — EXTRACTION_SYSTEM (v2),
+  `validation_system()` (v3), CONFIDENCE_SYSTEM (v2).
+- `workers/ao/agents/pipeline.py` — `_classify_eps_label` +
+  `_eps_gap` helpers, eps_gap fields on the new Result row.
+- `workers/ao/agents/confidence.py` — eps_gap in `_agreement_stats`.
+- `workers/ao/db/models.py` — three new columns on `Result`.
+- `workers/ao/db/engine.py` — `_COLUMN_MIGRATIONS` entries.
+
+**Next step**
+Live test with an Anthropic key configured:
+1. `/settings` → wipe. Add COST / DIS / SNOW via Add Companies.
+2. RUN ALL AGENTS → wait ~3 min for the three pipelines.
+3. Verify:
+   - COST card: green ring ~75-90%, no review row.
+   - DIS card: amber ring ~45-65%, no review row; deep-dive
+     provenance shows both the GAAP and the adjusted EPS rows.
+   - SNOW card: red ring ~20-40%, status `review`; `/review`
+     shows a row with GAAP −$0.90 vs non-GAAP +$0.39 candidates.
+
+---
+
+## Increment — Persistent universe cache + mirrored logos
+
+**Problem:** Add Companies took a long time to load — 163 rows + 153
+logo image fetches from `static.finnhub.io` on every cold visit. React
+Query's in-memory cache also evaporates on browser reload.
+
+**What landed**
+1. **localStorage cache of `/universe`** (`web/src/hooks.ts`). The
+   `useUniverse` hook now reads `ao-universe-cache-v1` from
+   localStorage as React Query `initialData` (with
+   `initialDataUpdatedAt`). The grid renders synchronously from the
+   cache; the network request continues in the background and
+   overwrites the cache on success. Survives both browser reload AND
+   server restart since the cache lives in the browser.
+2. **Mirrored 153 SP500 logos into the repo at
+   `web/public/logos/<TICKER>.png`** via
+   `workers/scripts/mirror_logos.py`. The script downloads every URL
+   in `LOGO_BY_TICKER`, then rewrites `ao/data/sp500_logos.py` so each
+   ticker maps to `/logos/<TICKER>.png`. 5.4 MB total on disk, largest
+   is SBUX at 111 KB. Idempotent — re-runs only fetch missing files;
+   `--force` re-downloads everything.
+3. **Serializer prefers the mirror over the stored Finnhub URL**
+   (`workers/ao/api/serializers.py`). `logoUrl` is now
+   `LOGO_BY_TICKER.get(c.ticker) or c.logo_url` — even pre-existing
+   tracked rows (e.g. the AAPL one from the earlier smoke test) load
+   logos from `/logos/` instead of `static.finnhub.io`.
+
+**Decisions baked in**
+- PNGs committed to the repo (per user ask). The repo grows by ~5.4 MB.
+- One-shot mirror script — not part of `npm run build` or app startup.
+  Re-run sequence: `python -m scripts.seed_logos` (refresh Finnhub
+  URLs) → `python -m scripts.mirror_logos` (download new ones).
+- Mirror wins over DB. Non-SP500 tickers a user adds keep their
+  external Finnhub URL via `Company.logo_url` as a fallback.
+- localStorage key versioned (`-v1`) so future schema bumps can
+  invalidate cleanly.
+
+**Verification done**
+- ASGI smoke: `GET /api/v1/universe` → AAPL row carries
+  `logoUrl=/logos/AAPL.png`; `GET /api/v1/companies` → tracked AAPL
+  ALSO reports `/logos/AAPL.png` (mirror override applied).
+- `npm run build` → tsc clean, 111 modules transformed.
+- `ls web/public/logos/ | wc -l` → 153.
+
+**Files touched**
+- `workers/scripts/mirror_logos.py` (new).
+- `workers/ao/data/sp500_logos.py` — values rewritten from Finnhub
+  URLs to `/logos/<TICKER>.png`.
+- `workers/ao/api/serializers.py` — mirror lookup wins over DB
+  `logo_url`.
+- `web/src/hooks.ts` — `useUniverse` reads/writes localStorage.
+- `web/public/logos/*.png` (new — 153 files, ~5.4 MB).
+
+**Next step**
+Visual QA in the browser:
+1. Open `/companies` → ADD COMPANIES. DevTools Network tab should show
+   logos loading from `localhost:5173/logos/*.png` (Vite static
+   handler) instead of `static.finnhub.io`.
+2. Reload the page — universe payload comes from localStorage (no
+   spinner before the grid renders); a background `/universe` call
+   updates the cache.
+3. Restart `ao-api` → reload — same instant-render experience.

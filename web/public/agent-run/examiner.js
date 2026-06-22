@@ -137,6 +137,7 @@
   // per-run state (reset in start)
   let playlist = [];           // tickers WITH bespoke fixtures — play full chapters
   let backgroundList = [];     // tickers without fixtures — render in the BG rail
+  let logoByTicker = {};       // ticker → logo CDN URL (Finnhub), populated by start()
   let cumulative = { pages: 0, tables: 0, figures: 0, sources: 0, cost: 0 };
   let results = [];
   const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
@@ -294,7 +295,11 @@
   // the brand subtitle to show "examining {TICKER} filings · N of M".
   function resetChapter(ticker, idx) {
     const sub = host && host.querySelector(".rc-sub");
-    if (sub) sub.innerHTML = `examining <b>${ticker}</b> filings · Claude Opus 4 · ${idx + 1} of ${playlist.length}`;
+    const logo = logoByTicker[ticker];
+    const logoHtml = logo
+      ? `<img class="rc-sub-logo" src="${logo}" alt="" onerror="this.remove()" /> `
+      : '';
+    if (sub) sub.innerHTML = `${logoHtml}examining <b>${ticker}</b> filings · Claude Opus 4 · ${idx + 1} of ${playlist.length}`;
     if (idx === 0) return;
     const srcWrap = $("[data-sources]"); if (srcWrap) srcWrap.innerHTML = "";
     const exWrap = $("[data-extract]"); if (exWrap) exWrap.innerHTML = "";
@@ -420,14 +425,21 @@
     if (!rail || !pills) return;
     if (!backgroundList.length) { rail.style.display = "none"; return; }
     rail.style.display = "";
-    pills.innerHTML = backgroundList.map((t) => `
+    pills.innerHTML = backgroundList.map((t) => {
+      const logo = logoByTicker[t];
+      const logoHtml = logo
+        ? `<img class="rc-bg-logo" src="${logo}" alt="" onerror="this.remove()" />`
+        : '';
+      return `
       <div class="rc-bg-pill refreshing" data-bgticker="${t}">
+        ${logoHtml}
         <span class="rc-bg-spin"></span>
         <span class="rc-bg-tk">${t}</span>
         <span class="rc-bg-kinds">quote · news · insider</span>
         <span class="rc-bg-stat">refreshing…</span>
       </div>
-    `).join("");
+    `;
+    }).join("");
   }
   function startBackgroundRail(totalMs) {
     if (!backgroundList.length) return;
@@ -449,7 +461,26 @@
   }
 
   async function run() {
-    if (!playlist.length) playlist = [Object.keys(window.EXAMINER_COMPANIES || {})[0] || "NVDA"];
+    // Background-only mode — no watchlist ticker has bespoke fixtures. Skip
+    // the document-examination chapter and just play the BG rail so we don't
+    // fake an extraction the user didn't run.
+    if (!playlist.length) {
+      if (!backgroundList.length) { finish(); return; }
+      const n = backgroundList.length;
+      const TOTAL = Math.max(6000, n * 700 + 4000);
+      const sub = host && host.querySelector(".rc-sub");
+      if (sub) sub.innerHTML = `scanning watchlist · <b>${n}</b> ${n === 1 ? "company" : "companies"} · live data refresh`;
+      hydrateBackgroundRail();
+      startElapsed(TOTAL);
+      startBackgroundRail(TOTAL);
+      await wait(Math.max(TOTAL - 1500, 1500));
+      const sumEl = $("[data-summary]");
+      if (sumEl) sumEl.innerHTML = `Refreshed quotes + news + insider for <b>${n}</b> ${n === 1 ? "company" : "companies"} (${backgroundList.join(", ")})`;
+      const sumCard = host && host.querySelector(".rc-summary"); if (sumCard) sumCard.classList.add("show");
+      await wait(2300);
+      finish();
+      return;
+    }
     const TOTAL = playlist.length * 9500 + 2500;
     hydrateBackgroundRail();
     startElapsed(TOTAL);
@@ -504,8 +535,12 @@
     host = null;
   }
 
-  // start() accepts a single ticker, an array of tickers, or undefined. The
-  // engine splits the input into two lists:
+  // start() accepts:
+  //   - a single ticker string
+  //   - an array of ticker strings
+  //   - an array of { ticker, logoUrl? } objects (carries real Finnhub logos)
+  //   - undefined (falls back to every key in EXAMINER_COMPANIES)
+  // The engine splits the input into two lists:
   //   - playlist: tickers WITH bespoke fixtures in EXAMINER_COMPANIES — each
   //     plays as its own examined-doc chapter (~9.5s).
   //   - backgroundList: tickers without fixtures — rendered in the
@@ -516,11 +551,24 @@
     if (hasRun) { if (typeof window.onAgentRunComplete === "function") window.onAgentRunComplete(); return; }
     hasRun = true;
     const reg = window.EXAMINER_COMPANIES || {};
-    const list = Array.isArray(tickersArg) ? tickersArg : (tickersArg ? [tickersArg] : Object.keys(reg));
+    let raw;
+    if (Array.isArray(tickersArg)) raw = tickersArg;
+    else if (tickersArg) raw = [tickersArg];
+    else raw = Object.keys(reg);
+    logoByTicker = {};
+    const list = raw.map((it) => {
+      if (it && typeof it === "object" && it.ticker) {
+        if (it.logoUrl) logoByTicker[it.ticker] = it.logoUrl;
+        return it.ticker;
+      }
+      return it;
+    });
     const dedup = Array.from(new Set(list.filter(Boolean)));
     playlist = dedup.filter((t) => reg[t]);
     backgroundList = dedup.filter((t) => !reg[t]);
-    if (!playlist.length) playlist = Object.keys(reg).slice(0, 1);
+    // No fallback to a registry key here — if the user's watchlist has no
+    // fixture-equipped tickers, run() drops into background-only mode so we
+    // don't fake a chapter for a ticker they didn't add.
     cumulative = { pages: 0, tables: 0, figures: 0, sources: 0, cost: 0 };
     results = [];
     teardown();           // guarantee no leftover console/timers

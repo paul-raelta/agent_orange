@@ -74,6 +74,10 @@ async def create_all() -> None:
 # create_all() handles new tables; this list handles new columns.
 _COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("companies", "archived_at", "TEXT"),
+    ("companies", "logo_url", "TEXT"),
+    ("results", "eps_gaap_value", "REAL"),
+    ("results", "eps_non_gaap_value", "REAL"),
+    ("results", "eps_sign_flip", "INTEGER DEFAULT 0"),
 ]
 
 

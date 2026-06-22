@@ -152,7 +152,7 @@ export function Company() {
 
       <div className="co-hd">
         <div className="wl-id">
-          <Glyph ticker={c.ticker} status={c.status} />
+          <Glyph ticker={c.ticker} status={c.status} logoUrl={c.logoUrl} />
           <div>
             <div className="co-ticker">
               {c.ticker} <span className="co-sector">{c.sector}</span>
@@ -341,8 +341,22 @@ export function Company() {
                 <thead>
                   <tr>
                     <th className="sticky-col">METRIC</th>
-                    {flags.consensus && <th className="num cons-col">CONS</th>}
-                    {flags.consensus && <th className="num">SURP</th>}
+                    {flags.consensus && (
+                      <th
+                        className="num cons-col"
+                        title="Consensus — Wall Street estimate for this metric"
+                      >
+                        CONS
+                      </th>
+                    )}
+                    {flags.consensus && (
+                      <th
+                        className="num"
+                        title="Surprise % — (actual − estimate) / |estimate| × 100. Positive = beat, negative = miss."
+                      >
+                        SURP
+                      </th>
+                    )}
                     {c.history.map((h) => (
                       <th key={h.period}>
                         <div className="th-period">{h.period}</div>
@@ -655,7 +669,10 @@ function ConsensusBanner({ metrics }: { metrics: Metric[] }) {
   const label = kind === 'beat' ? 'BEAT' : kind === 'miss' ? 'MISS' : 'IN LINE'
   return (
     <div className={'co-cons-banner' + (kind === 'miss' ? ' miss' : '')}>
-      <span className={'beat-badge ' + kind}>
+      <span
+        className={'beat-badge ' + kind}
+        title="Headline EPS vs Wall Street consensus estimate. >+0.5% = BEAT, <−0.5% = MISS, otherwise IN LINE."
+      >
         {label} {epsSurprise >= 0 ? '+' : ''}{epsSurprise.toFixed(1)}%
       </span>
       <span className="co-cons-banner-tx">

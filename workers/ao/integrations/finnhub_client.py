@@ -48,6 +48,26 @@ async def quote(symbol: str) -> dict | None:
         return await _get(client, "/quote", {"symbol": symbol})
 
 
+async def company_profile(symbol: str) -> dict | None:
+    """`/stock/profile2` — returns {logo, weburl, name, country, exchange, …}.
+
+    None when Finnhub is unconfigured, the symbol is unknown (Finnhub returns
+    an empty object), or the network errored. Best-effort: callers persist
+    the `logo` field and fall back to the ticker monogram if absent.
+    """
+    if not is_configured():
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            data = await _get(client, "/stock/profile2", {"symbol": symbol})
+    except (httpx.HTTPError, ValueError):
+        log.warning("finnhub.profile.failed", symbol=symbol)
+        return None
+    if not isinstance(data, dict) or not data:
+        return None
+    return data
+
+
 async def company_news(symbol: str, *, days: int = 30) -> list[dict]:
     if not is_configured():
         return []

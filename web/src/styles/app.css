@@ -407,6 +407,38 @@
   gap: 8px;
 }
 
+/* REFRESHING / QUEUED pill — shown while the agent pipeline is mid-run for
+   this company. Sits in .wl-card-top-right alongside the gauge + status. */
+.wl-pipeline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  color: var(--accent);
+  background: rgba(255, 153, 0, 0.08);
+}
+.wl-pipeline-pill.queued {
+  border-color: var(--line);
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.03);
+}
+.wl-pipeline-pill .chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.wl-pipeline-pill.queued .chip-dot {
+  background: var(--text-2);
+}
+
 /* Confidence breakdown (inside the drawer) */
 .cfb-head {
   display: flex;
@@ -545,6 +577,17 @@
   width: 2px;
   border-radius: 2px;
   background: var(--g);
+}
+/* Real logo render — fills the tile, white background reads clean against
+   the panel surface, status accent bar (the ::after) stays visible. */
+.glyph img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+  border-radius: inherit;
+  padding: 2px;
+  box-sizing: border-box;
 }
 
 /* ===== Panel ===== */
@@ -740,6 +783,43 @@
 }
 .wl-foot-note.ok {
   color: var(--green);
+}
+
+.wl-unsupported {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 11px 13px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--panel-2);
+}
+.wl-unsupported-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex: 0 0 auto;
+}
+.wl-unsupported-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.wl-unsupported-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  text-transform: uppercase;
+}
+.wl-unsupported-sub {
+  font-size: 10.5px;
+  color: var(--text-3);
+  line-height: 1.4;
 }
 
 /* ===== Company deep-dive ===== */
@@ -2520,6 +2600,7 @@ select.inp {
 .ac-glyph{width:34px;height:34px;flex:0 0 34px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em;background:var(--raised);color:var(--text);border:1px solid var(--line);position:relative;overflow:hidden}
 .ac-glyph::after{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--text-3)}
 .ac-glyph.sm{width:26px;height:26px;flex-basis:26px;font-size:9px}
+.ac-glyph img{width:100%;height:100%;object-fit:contain;background:#fff;border-radius:inherit;padding:2px;box-sizing:border-box}
 
 /* toolbar */
 .ac-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}

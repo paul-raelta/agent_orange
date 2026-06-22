@@ -11,14 +11,38 @@ import { Loading } from '../components/Loading'
 import { Reveal } from '../motion/motion'
 import { useAddCompanies, useUniverse } from '../hooks'
 import { SP500_SECTORS } from '../data/sp500'
+import { SUPPORTED_TICKERS } from '../data/supported'
 import type { DiscoveryResult, UniverseCompany } from '../types'
 
 const fmtCap = (b: number) => (b >= 1000 ? `$${(b / 1000).toFixed(2)}T` : `$${b}B`)
 const slug = (n: string) =>
   n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '').slice(0, 18)
 
-function MonoGlyph({ ticker, sm }: { ticker: string; sm?: boolean }) {
-  return <span className={'ac-glyph' + (sm ? ' sm' : '')}>{ticker.replace('.', '').slice(0, 2)}</span>
+function MonoGlyph({
+  ticker,
+  sm,
+  logoUrl,
+}: {
+  ticker: string
+  sm?: boolean
+  logoUrl?: string | null
+}) {
+  const [broken, setBroken] = useState(false)
+  const showImg = !!logoUrl && !broken
+  return (
+    <span className={'ac-glyph' + (sm ? ' sm' : '')}>
+      {showImg ? (
+        <img
+          src={logoUrl ?? undefined}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        ticker.replace('.', '').slice(0, 2)
+      )}
+    </span>
+  )
 }
 function Chg({ v }: { v: number }) {
   const up = v >= 0
@@ -48,7 +72,7 @@ function Card({
       onClick={() => !c.tracked && onToggle(c.ticker)}
     >
       <div className="ac-card-top">
-        <MonoGlyph ticker={c.ticker} />
+        <MonoGlyph ticker={c.ticker} logoUrl={c.logoUrl} />
         <div className="ac-id">
           <div className="ac-tkr">{c.ticker}</div>
           <div className="ac-name">{c.name}</div>
@@ -191,6 +215,13 @@ function Browse({
       .filter((g) => g.items.length)
   }, [sortedGrid, sector])
 
+  const recommended = useMemo(() => {
+    const byTicker = new Map(universe.map((c) => [c.ticker, c]))
+    return [...SUPPORTED_TICKERS]
+      .map((t) => byTicker.get(t))
+      .filter((c): c is UniverseCompany => Boolean(c))
+  }, [universe])
+
   const tableRows = useMemo(() => {
     const arr = [...filtered]
     arr.sort((a, b) => {
@@ -297,6 +328,32 @@ function Browse({
         {filtered.length} companies{sector !== 'All' ? ` in ${sector}` : ''}
         {query ? ` matching “${query}”` : ''} · {selected.size} selected
       </div>
+
+      {view === 'grid' && recommended.length > 0 && (
+        <div className="ac-group">
+          <div className="ac-group-hd" style={{ cursor: 'default' }}>
+            <span className="ac-gname">Recommended</span>
+            <span className="ac-gcount">{recommended.length} cos</span>
+            <span
+              className="ac-gcount"
+              style={{ marginLeft: 'auto', color: 'var(--text-3)' }}
+            >
+              quick access · full data coverage
+            </span>
+          </div>
+          <Reveal className="ac-grid">
+            {recommended.map((c, i) => (
+              <Card
+                key={c.ticker}
+                c={c}
+                selected={selected.has(c.ticker)}
+                onToggle={toggle}
+                index={i}
+              />
+            ))}
+          </Reveal>
+        </div>
+      )}
 
       {view === 'grid' ? (
         !groups.length ? (
@@ -533,7 +590,7 @@ function Discover({
           <div className={'ac-drow ' + rowCls} key={c.ticker}>
             <div className="ac-dhd">
               <div className="ac-did">
-                <MonoGlyph ticker={c.ticker} sm />
+                <MonoGlyph ticker={c.ticker} sm logoUrl={c.logoUrl} />
                 <div style={{ minWidth: 0 }}>
                   <div className="ac-dtkr">{c.ticker}</div>
                   <div className="ac-dnm">{c.name}</div>

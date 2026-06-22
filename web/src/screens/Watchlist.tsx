@@ -5,7 +5,8 @@ import { Btn, Conf, ConfidenceGauge, Delta, Glyph, Price, Spark, StatusChip } fr
 import { CountUp, Reveal, SkeletonCard } from '../motion/motion'
 import { useCompanies, useFeatureFlags, usePortfolioTotals } from '../hooks'
 import { useShell } from '../layout/shellContext'
-import type { Company, FeatureFlags, MetricConsensus } from '../types'
+import { isSupported } from '../data/supported'
+import type { Company, FeatureFlags, MetricConsensus, PipelineRun } from '../types'
 
 function fmtMoney(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
@@ -135,10 +136,43 @@ function cardBeatSummary(
   return { kind: 'inline', pct: avg }
 }
 
+function fmtEta(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  return `${Math.ceil(seconds / 60)}m`
+}
+
+function PipelineBadge({ run }: { run: PipelineRun }) {
+  const eta = run.etaRemainingSeconds
+  const label =
+    run.state === 'queued'
+      ? eta > 0
+        ? `QUEUED · ~${fmtEta(eta)}`
+        : 'QUEUED'
+      : eta > 0
+        ? `REFRESHING · ~${fmtEta(eta)}`
+        : 'FINISHING…'
+  return (
+    <span
+      className={'wl-pipeline-pill ' + run.state}
+      title={
+        run.state === 'queued'
+          ? 'Pipeline waits its turn — running serially.'
+          : 'Agents are extracting + validating + scoring this filing.'
+      }
+    >
+      <span className="chip-dot pulse" />
+      {label}
+    </span>
+  )
+}
+
 function BeatBadge({ kind, pct }: { kind: 'beat' | 'miss' | 'inline'; pct: number }) {
   const label = kind === 'beat' ? 'BEAT' : kind === 'miss' ? 'MISS' : 'IN LINE'
   return (
-    <span className={'beat-badge ' + kind}>
+    <span
+      className={'beat-badge ' + kind}
+      title="Average earnings surprise vs Wall Street consensus across the latest metrics on this card. >+0.5% = BEAT, <−0.5% = MISS, otherwise IN LINE."
+    >
       {label} {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
     </span>
   )
@@ -157,17 +191,19 @@ function CompanyCard({
 }) {
   const L = c.latest
   const beat = flags.consensus ? cardBeatSummary(L.metrics) : null
+  const supported = isSupported(c.ticker)
   return (
     <article className={'wl-card status-' + c.status} onClick={onOpen}>
       <div className="wl-card-top">
         <div className="wl-id">
-          <Glyph ticker={c.ticker} status={c.status} />
+          <Glyph ticker={c.ticker} status={c.status} logoUrl={c.logoUrl} />
           <div>
             <div className="wl-ticker">{c.ticker}</div>
             <div className="wl-name">{c.name}</div>
           </div>
         </div>
         <div className="wl-card-top-right">
+          {c.pipelineRun && <PipelineBadge run={c.pipelineRun} />}
           {c.confidence && (
             <ConfidenceGauge
               confidence={c.confidence}
@@ -200,61 +236,75 @@ function CompanyCard({
         </div>
       )}
 
-      <div className="wl-period">
-        <span className="wl-period-lab">
-          {c.status === 'watching' ? 'LAST REPORTED' : 'LATEST'}
-        </span>
-        <span className="wl-period-val">{L.period}</span>
-        <span className="wl-period-end">ended {L.periodEnd}</span>
-      </div>
+      {supported ? (
+        <>
+          <div className="wl-period">
+            <span className="wl-period-lab">
+              {c.status === 'watching' ? 'LAST REPORTED' : 'LATEST'}
+            </span>
+            <span className="wl-period-val">{L.period}</span>
+            <span className="wl-period-end">ended {L.periodEnd}</span>
+          </div>
 
-      <div className="wl-metrics">
-        {L.metrics.slice(0, 3).map((m) => {
-          const cs = flags.consensus ? m.consensus : undefined
-          const surpClass =
-            cs ? (cs.surprisePct > 0.3 ? 'up' : cs.surprisePct < -0.3 ? 'down' : 'flat') : ''
-          return (
-            <div className="wl-metric" key={m.key}>
-              <div className="wl-metric-top">
-                <span className="wl-metric-key">{m.key}</span>
-                <Conf level={m.conf} />
-              </div>
-              <div className="wl-metric-val">{m.value}</div>
-              {cs ? (
-                <div className={'wl-metric-surp ' + surpClass}>
-                  {cs.surprisePct >= 0 ? '+' : ''}
-                  {cs.surprisePct.toFixed(1)}% vs est
+          <div className="wl-metrics">
+            {L.metrics.slice(0, 3).map((m) => {
+              const cs = flags.consensus ? m.consensus : undefined
+              const surpClass =
+                cs ? (cs.surprisePct > 0.3 ? 'up' : cs.surprisePct < -0.3 ? 'down' : 'flat') : ''
+              return (
+                <div className="wl-metric" key={m.key}>
+                  <div className="wl-metric-top">
+                    <span className="wl-metric-key">{m.key}</span>
+                    <Conf level={m.conf} />
+                  </div>
+                  <div className="wl-metric-val">{m.value}</div>
+                  {cs ? (
+                    <div className={'wl-metric-surp ' + surpClass}>
+                      {cs.surprisePct >= 0 ? '+' : ''}
+                      {cs.surprisePct.toFixed(1)}% vs est
+                    </div>
+                  ) : (
+                    <Delta value={m.yoy} />
+                  )}
                 </div>
-              ) : (
-                <Delta value={m.yoy} />
-              )}
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
 
-      <div className="wl-foot">
-        {c.status === 'review' ? (
-          <button
-            className="wl-foot-cta review"
-            onClick={(e) => {
-              e.stopPropagation()
-              onReview()
-            }}
-          >
-            ⚑ 2 items need your review →
-          </button>
-        ) : c.status === 'watching' ? (
-          <span className="wl-foot-note">
-            <span className="chip-dot pulse" style={{ background: 'var(--amber)' }} />{' '}
-            {c.nextWindow.label} · {c.nextWindow.from}–{c.nextWindow.to}
-          </span>
-        ) : (
-          <span className="wl-foot-note ok">
-            ✓ {L.validation.corroborations}× corroborated · validated {L.validatedOn}
-          </span>
-        )}
-      </div>
+          <div className="wl-foot">
+            {c.status === 'review' ? (
+              <button
+                className="wl-foot-cta review"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReview()
+                }}
+              >
+                ⚑ 2 items need your review →
+              </button>
+            ) : c.status === 'watching' ? (
+              <span className="wl-foot-note">
+                <span className="chip-dot pulse" style={{ background: 'var(--amber)' }} />{' '}
+                {c.nextWindow.label} · {c.nextWindow.from}–{c.nextWindow.to}
+              </span>
+            ) : (
+              <span className="wl-foot-note ok">
+                ✓ {L.validation.corroborations}× corroborated · validated {L.validatedOn}
+              </span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="wl-unsupported">
+          <span className="wl-unsupported-dot" aria-hidden />
+          <div className="wl-unsupported-copy">
+            <div className="wl-unsupported-title">Company not yet supported</div>
+            <div className="wl-unsupported-sub">
+              Detailed extraction and confidence coverage will land in a future release.
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   )
 }

@@ -23,7 +23,10 @@
 @keyframes rc-pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 .rc-title { font-size: 13px; letter-spacing: .2em; font-weight: 700; }
 .rc-title b { color: var(--accent); }
-.rc-sub { font-size: 10px; color: var(--text-3); letter-spacing: .07em; margin-top: 2px; }
+.rc-sub { font-size: 10px; color: var(--text-3); letter-spacing: .07em; margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 6px; }
+.rc-sub-logo { width: 16px; height: 16px; object-fit: contain;
+  background: #fff; border-radius: 3px; padding: 1px; vertical-align: middle; }
 .rc-counters { display: flex; gap: 24px; margin-left: auto; align-items: center; }
 .rc-counter { display: flex; flex-direction: column; align-items: flex-end; }
 .rc-counter-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
@@ -57,6 +60,8 @@
   animation: rc-spin .7s linear infinite; flex: 0 0 auto; }
 .rc-bg-pill.done .rc-bg-spin { border-color: var(--green);
   border-right-color: transparent; animation: none; opacity: .5; }
+.rc-bg-logo { width: 14px; height: 14px; object-fit: contain; background: #fff;
+  border-radius: 3px; padding: 1px; flex: 0 0 auto; }
 
 /* ---------- body: 3 columns ---------- */
 .rc-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 248px 1fr 270px; gap: 1px; background: var(--line); }

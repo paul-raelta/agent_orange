@@ -30,6 +30,52 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+_NON_GAAP_LABEL_TOKENS = ("non-gaap", "non gaap", "adjusted", "reconciliation")
+_GAAP_LABEL_TOKENS = ("gaap", "income statement", "statements of operations", "operations")
+
+
+def _classify_eps_label(label: str) -> str:
+    """Return 'non_gaap', 'gaap', or 'unknown' for a provenance source label."""
+    s = (label or "").lower()
+    if any(tok in s for tok in _NON_GAAP_LABEL_TOKENS):
+        # "GAAP to non-GAAP reconciliation" — tokens like 'reconciliation' or
+        # 'non-gaap' both correctly classify these as the non-GAAP side.
+        return "non_gaap"
+    if any(tok in s for tok in _GAAP_LABEL_TOKENS):
+        return "gaap"
+    return "unknown"
+
+
+def _eps_gap(
+    by_key: dict[str, list["extraction.ExtractedMetric"]],
+) -> tuple[float | None, float | None, bool]:
+    """Pull a GAAP and a non-GAAP diluted EPS value out of the extracted
+    locations, using `source_label` tags. Returns (gaap, non_gaap, sign_flip).
+    Either side can be None — only when both are present is the comparison
+    meaningful."""
+    locs = by_key.get("EPS · diluted", [])
+    gaap: float | None = None
+    non_gaap: float | None = None
+    for loc in locs:
+        kind = _classify_eps_label(loc.source_label)
+        if kind == "non_gaap" and non_gaap is None:
+            non_gaap = float(loc.raw_value)
+        elif kind == "gaap" and gaap is None:
+            gaap = float(loc.raw_value)
+    # Fallback: if nothing was tagged GAAP, accept the first 'unknown' location
+    # as the GAAP value (the extractor's default order puts the income
+    # statement first).
+    if gaap is None:
+        for loc in locs:
+            if _classify_eps_label(loc.source_label) == "unknown":
+                gaap = float(loc.raw_value)
+                break
+    sign_flip = False
+    if gaap is not None and non_gaap is not None and gaap != 0 and non_gaap != 0:
+        sign_flip = (gaap > 0) != (non_gaap > 0)
+    return gaap, non_gaap, sign_flip
+
+
 async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
     """Run a single end-to-end pipeline pass for one ticker."""
     ticker = ticker.upper()
@@ -96,6 +142,11 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
             )
             confs[v.key] = v.conf
 
+    # GAAP vs non-GAAP EPS gap, derived from the locations the extractor
+    # surfaced. Used by the confidence stage to spread scores between
+    # GAAP-only filings (no gap) and sign-flip outliers (severe).
+    eps_gaap_value, eps_non_gaap_value, eps_sign_flip = _eps_gap(by_key)
+
     # --- 5. Persist Result + Metric + Provenance ---------------------
     result_row = m.Result(
         id=uuid4().hex, company_id=company.id, filing_id=new_filing.id,
@@ -108,6 +159,9 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
         validation_detail=verdict.detail if verdict else "",
         validation_corroborations=verdict.corroborations if verdict else 0,
         validation_conflict=verdict.conflict if verdict else False,
+        eps_gaap_value=eps_gaap_value,
+        eps_non_gaap_value=eps_non_gaap_value,
+        eps_sign_flip=eps_sign_flip,
         is_latest=True,
     )
     session.add(result_row)

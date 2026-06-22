@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ao.agents import pipeline_state
 from ao.agents.pipeline import run_one
 from ao.api import schemas as s
 from ao.api.deps import current_user_id, get_db
@@ -28,12 +29,15 @@ log = get_logger(__name__)
 
 async def _bg_run(user_id: str, ticker: str) -> None:
     """Fire-and-forget pipeline run; opens its own session so the request can return."""
+    pipeline_state.mark_started(user_id, ticker)
     Session = get_sessionmaker()
     try:
         async with Session() as session:
             await run_one(session, user_id, ticker)
     except Exception as exc:  # noqa: BLE001
         log.error("bg_run.failed", ticker=ticker, error=str(exc))
+    finally:
+        pipeline_state.mark_finished(user_id, ticker)
 
 
 async def _bg_run_all(user_id: str) -> None:
@@ -57,6 +61,11 @@ async def _bg_run_all(user_id: str) -> None:
                 m.Company.user_id == user_id, m.Company.archived_at.is_(None)
             )
         )).all()
+
+    # (Queue is populated synchronously by the route handler before the bg
+    # task starts; see POST /run. We re-queue defensively in case _bg_run_all
+    # was invoked through a path that bypasses the handler.)
+    pipeline_state.queue_tickers(user_id, [t for (t,) in rows])
 
     # Pre-pipeline data refreshes — confidence reads these.
     for label, fn in (
@@ -110,6 +119,15 @@ async def run_all(
         level="info", message="Manual run requested for all agents.",
     ))
     await db.commit()
+    # Synchronously queue tickers BEFORE returning so the frontend's
+    # onSuccess refetch picks up `pipelineRun` immediately — otherwise the
+    # background task races the refetch and the QUEUED pill flashes late.
+    tickers = (await db.execute(
+        select(m.Company.ticker).where(
+            m.Company.user_id == user_id, m.Company.archived_at.is_(None)
+        )
+    )).all()
+    pipeline_state.queue_tickers(user_id, [t for (t,) in tickers])
     background.add_task(_bg_run_all, user_id)
     return s.RunResponse(jobId=job_id, lastSync=_human_now())
 
@@ -127,6 +145,9 @@ async def trigger_run_one(
         level="info", message=f"Manual run requested for {ticker.upper()}.",
     ))
     await db.commit()
+    # Synchronously queue the ticker so the watchlist's first refetch sees
+    # the QUEUED state — _bg_run flips it to RUNNING when the bg task starts.
+    pipeline_state.queue_tickers(user_id, [ticker.upper()])
     background.add_task(_bg_run, user_id, ticker)
     return s.RunResponse(jobId=job_id, lastSync=_human_now())
 

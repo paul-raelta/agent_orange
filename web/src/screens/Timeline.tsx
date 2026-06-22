@@ -12,7 +12,7 @@ type Bar =
   | { type: 'reported'; at: number; label: string }
   | { type: 'window' | 'watching'; from: number; to: number; label: string }
 
-type Lane = { ticker: string; status: Status; bars: Bar[] }
+type Lane = { ticker: string; status: Status; logoUrl?: string | null; bars: Bar[] }
 
 const MONTHS = ['APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 const FIRST_MONTH_IDX = 3 // Apr = index 3 in JS month numbering
@@ -46,7 +46,7 @@ function laneFor(c: Company): Lane {
       label: c.nextWindow.label || (c.status === 'watching' ? 'watching' : 'expected'),
     })
   }
-  return { ticker: c.ticker, status: c.status, bars }
+  return { ticker: c.ticker, status: c.status, logoUrl: c.logoUrl, bars }
 }
 
 export function Timeline() {
@@ -93,7 +93,7 @@ export function Timeline() {
                 {lanes.map((ln) => (
                   <div className="tl-lane" key={ln.ticker} onClick={() => navigate('/company/' + ln.ticker)}>
                     <div className="tl-lanelabel">
-                      <Glyph ticker={ln.ticker} status={ln.status} />
+                      <Glyph ticker={ln.ticker} status={ln.status} logoUrl={ln.logoUrl} />
                       <span>{ln.ticker}</span>
                     </div>
                     <div className="tl-track">
@@ -146,7 +146,7 @@ export function Timeline() {
             {lanes.map((ln) => (
               <div className="tla-card" key={ln.ticker} onClick={() => navigate('/company/' + ln.ticker)}>
                 <div className="tla-hd">
-                  <Glyph ticker={ln.ticker} status={ln.status} />
+                  <Glyph ticker={ln.ticker} status={ln.status} logoUrl={ln.logoUrl} />
                   <span className="tla-ticker">{ln.ticker}</span>
                   <StatusChip status={ln.status} pulse />
                 </div>

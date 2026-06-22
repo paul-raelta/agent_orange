@@ -70,6 +70,16 @@ async def _channels_for(event: Event) -> tuple[bool, bool, str, str]:
     return prefs.email_enabled, prefs.sms_enabled, prefs.email, prefs.phone
 
 
+def _split_recipients(s: str) -> list[str]:
+    """Split a stored email/phone string into a list of recipients.
+
+    Accepts comma-separated values; trims whitespace; drops empties.
+    """
+    if not s:
+        return []
+    return [part.strip() for part in s.split(",") if part.strip()]
+
+
 def _subject_and_body(event: Event) -> tuple[str, str]:
     pl = event.payload or {}
     if event.type == "validated":
@@ -123,11 +133,22 @@ async def dispatch(event: Event) -> None:
 
     subj, body = _subject_and_body(event)
 
-    if email_on and email_to:
-        await asyncio.to_thread(
-            gmail_smtp.send, to=email_to, subject=subj, body_text=body,
-        )
-    if sms_on and phone_to:
-        await asyncio.to_thread(
-            twilio_client.send_sms, to=phone_to, body=f"{subj}\n{body}",
-        )
+    email_list = _split_recipients(email_to)
+    phone_list = _split_recipients(phone_to)
+
+    if email_on and email_list:
+        for addr in email_list:
+            try:
+                await asyncio.to_thread(
+                    gmail_smtp.send, to=addr, subject=subj, body_text=body,
+                )
+            except Exception as exc:
+                log.warn("notify.email.send_failed", to=addr, error=str(exc))
+    if sms_on and phone_list:
+        for num in phone_list:
+            try:
+                await asyncio.to_thread(
+                    twilio_client.send_sms, to=num, body=f"{subj}\n{body}",
+                )
+            except Exception as exc:
+                log.warn("notify.sms.send_failed", to=num, error=str(exc))

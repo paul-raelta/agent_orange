@@ -69,6 +69,7 @@ class Company(Base):
     source_mode: Mapped[str] = mapped_column(String, default="auto")  # auto|guided|advanced
     cik: Mapped[str | None] = mapped_column(String, nullable=True)
     ir_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Portfolio
     shares: Mapped[float] = mapped_column(Float, default=0.0)
@@ -148,6 +149,10 @@ class Result(Base):
     validation_detail: Mapped[str] = mapped_column(Text, default="")
     validation_corroborations: Mapped[int] = mapped_column(Integer, default=0)
     validation_conflict: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    eps_gaap_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    eps_non_gaap_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    eps_sign_flip: Mapped[bool] = mapped_column(Boolean, default=False)
 
     narrative: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_latest: Mapped[bool] = mapped_column(Boolean, default=False)

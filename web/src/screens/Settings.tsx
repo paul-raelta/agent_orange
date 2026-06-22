@@ -170,23 +170,30 @@ export function Settings() {
       <Panel title="NOTIFICATIONS">
         <div className="notif-grid">
           <label>
-            <span className="lbl">EMAIL</span>
+            <span className="lbl">EMAIL ADDRESSES</span>
             <input
               className="inp"
-              type="email"
+              type="text"
+              placeholder="paul@example.com, alex@example.com"
               value={draft.email}
               onChange={(e) => update('email', e.target.value)}
             />
+            <span className="hint" style={{ fontSize: 10, color: 'var(--text-3)' }}>
+              comma-separate multiple recipients
+            </span>
           </label>
           <label>
-            <span className="lbl">PHONE (E.164)</span>
+            <span className="lbl">PHONE NUMBERS (E.164)</span>
             <input
               className="inp"
               type="tel"
-              placeholder="+353…"
+              placeholder="+353…, +1…"
               value={draft.phone}
               onChange={(e) => update('phone', e.target.value)}
             />
+            <span className="hint" style={{ fontSize: 10, color: 'var(--text-3)' }}>
+              comma-separate multiple recipients
+            </span>
           </label>
         </div>
         <div className="notif-toggles">

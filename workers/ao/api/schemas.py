@@ -217,6 +217,17 @@ class GuidanceItem(WireBase):
     provenance: GuidanceProvenance
 
 
+PipelineRunState = Literal["running", "queued"]
+
+
+class PipelineRun(WireBase):
+    """Set when the company's agent pipeline is mid-run. Drives the
+    REFRESHING / QUEUED indicator on the watchlist card."""
+    state: PipelineRunState
+    startedAt: str | None = None  # ISO timestamp, only for state="running"
+    etaRemainingSeconds: int
+
+
 class Company(WireBase):
     ticker: str
     name: str
@@ -249,9 +260,15 @@ class Company(WireBase):
     # Optional investor-relations URL. When set, ir_fetcher uses it during the
     # discover step instead of (or in addition to) the user-global IR source.
     irUrl: str | None = None
+    # Real company logo (CDN URL from Finnhub /stock/profile2). Null falls
+    # back to the 2-letter ticker monogram in the UI.
+    logoUrl: str | None = None
     # Forward guidance — only populated when flags.guidance is on; the dedicated
     # GET /companies/{ticker}/guidance endpoint is the canonical fetch.
     guidance: list[GuidanceItem] | None = None
+    # Set while the agent pipeline is running or queued for this company.
+    # Null means idle. UI uses this to show the REFRESHING / QUEUED pill.
+    pipelineRun: PipelineRun | None = None
 
 
 class ReviewCandidate(WireBase):
@@ -499,6 +516,7 @@ class UniverseCompany(WireBase):
     earn: str            # next-earnings display label, e.g. "Aug 06"
     earnDays: int
     tracked: bool
+    logoUrl: str | None = None
 
 
 class BatchAddRequest(WireBase):

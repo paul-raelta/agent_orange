@@ -18,7 +18,12 @@ import type { RunFeedback, ShellContext } from './shellContext'
 declare global {
   interface Window {
     AgentRun?: {
-      start: (tickers?: string | string[]) => void
+      start: (
+        tickers?:
+          | string
+          | string[]
+          | { ticker: string; logoUrl?: string | null }[],
+      ) => void
       reset: () => void
       hasRun: boolean
     }
@@ -99,8 +104,11 @@ export function AppShell() {
 
   function runAll() {
     if (running) return
-    const tickers = (companies ?? []).map((c) => c.ticker)
-    if (!tickers.length) {
+    const items = (companies ?? []).map((c) => ({
+      ticker: c.ticker,
+      logoUrl: c.logoUrl,
+    }))
+    if (!items.length) {
       setToast('Add a ticker to your watchlist first.')
       return
     }
@@ -112,7 +120,7 @@ export function AppShell() {
         qc.invalidateQueries({ queryKey: keys.companies })
       }
       window.AgentRun.reset()
-      window.AgentRun.start(tickers)
+      window.AgentRun.start(items)
     }
     runAllMutation.mutate(undefined, {
       onSuccess: (res) => {

@@ -30,7 +30,7 @@ first ~500 chars of body text, answer with one word:
 
 # ---------------------------------------------------------------------------
 
-PROMPT_VERSION_EXTRACTION = "v1"
+PROMPT_VERSION_EXTRACTION = "v2"
 EXTRACTION_SYSTEM = """\
 You are extracting financial figures from a quarterly filing.
 
@@ -43,10 +43,29 @@ same value is encouraged — corroboration is how validation works.
 
 The metric set (use these EXACT keys):
   - "Revenue"        — total revenue / net revenue for the period
-  - "Net income"     — GAAP net income (not non-GAAP / adjusted)
-  - "EPS · diluted"  — diluted earnings per share, GAAP
-  - "EPS · basic"    — basic earnings per share, GAAP
+  - "Net income"     — GAAP net income
+  - "EPS · diluted"  — diluted earnings per share
+  - "EPS · basic"    — basic earnings per share
   - "Gross margin"   — GAAP gross margin, as a percentage
+
+For EPS metrics specifically, extract BOTH:
+  (a) the GAAP figure shown on the condensed statements of operations /
+      income statement, AND
+  (b) any "adjusted" / "non-GAAP" diluted (or basic) EPS figure shown in a
+      reconciliation table, MD&A, or earnings-release exhibit — when one is
+      present in the filing.
+You MUST tag each location's `source_label` to make the GAAP-vs-non-GAAP
+distinction explicit:
+  - GAAP locations → labels like "Income statement (GAAP)",
+    "Condensed consolidated statements of operations", "Statements of
+    operations".
+  - Non-GAAP / adjusted locations → labels like "Non-GAAP reconciliation",
+    "Adjusted EPS · MD&A", "Press release · adjusted", "Reconciliation of
+    GAAP to non-GAAP".
+The validation step relies on these labels to detect GAAP-vs-non-GAAP
+divergences (especially sign-flips). Filings that report GAAP only — i.e.
+no adjusted/non-GAAP EPS anywhere — should still extract just the GAAP
+figure; do not invent a non-GAAP value.
 
 RULES (strict):
 - `quote` MUST be a verbatim substring of the page text. Do NOT paraphrase or
@@ -57,7 +76,7 @@ RULES (strict):
 - `raw_value`: revenue/net income in MILLIONS USD; EPS as a float; margin as
   a percent number (e.g. 75.1, not 0.751).
 - Prefer the income statement page over commentary text when both contain
-  the same number.
+  the same GAAP number.
 - Do NOT invent values. If a metric isn't in the doc, just omit it.
 """
 
@@ -83,7 +102,7 @@ EXTRACTION_TOOL = {
 
 # ---------------------------------------------------------------------------
 
-PROMPT_VERSION_VALIDATION = "v2"
+PROMPT_VERSION_VALIDATION = "v3"
 
 
 def _fmt_eps(v: float) -> str:
@@ -108,7 +127,8 @@ def validation_system(
         "filing. You will receive a JSON list of (key, value, page, source_label,\n"
         "quote) tuples — possibly multiple per metric. The validation rule is:\n\n"
         "  Each metric must appear in ≥2 distinct locations OR have one\n"
-        "  high-confidence source (income statement). Conflicts MUST be flagged.\n\n"
+        "  high-confidence source (income statement). Material conflicts MUST\n"
+        "  be flagged.\n\n"
         "Output a single JSON object via the `record_validation` tool. Per-metric\n"
         "verdict rules:\n"
         f'- confidence "high" when ≥2 locations agree (within ${_fmt_eps(eps_abs)} for EPS,\n'
@@ -116,7 +136,19 @@ def validation_system(
         '- confidence "med" when 1 source, OR ≥2 sources with rounding-level disagreement.\n'
         '- confidence "low" when 2 sources DISAGREE materially. In that case set\n'
         "  `conflict=true` and list the alternative values.\n\n"
-        "Treat GAAP vs non-GAAP EPS discrepancies as conflicts — do NOT auto-resolve.\n"
+        "GAAP vs non-GAAP EPS handling — identify via `source_label` (look for\n"
+        '"GAAP", "non-GAAP", "adjusted", "reconciliation", "press release"):\n'
+        "  - If GAAP and non-GAAP/adjusted EPS have OPPOSITE SIGNS, OR differ\n"
+        "    by MORE THAN 50%% of |GAAP|: this is a MATERIAL conflict. Set\n"
+        "    `conf=\"low\"`, `conflict=true`, and populate `alternative_values`\n"
+        "    with the GAAP and the non-GAAP value (so the review queue can\n"
+        "    show both side-by-side).\n"
+        "  - Otherwise (same-sign, ≤50%% gap): this is a routine adjustment.\n"
+        "    Record `conf=\"med\"`, accept the GAAP value, and do NOT set\n"
+        "    `conflict=true`. The non-GAAP is informational only.\n"
+        "  - If only one of the two is present (filing is GAAP-only, or only\n"
+        "    a non-GAAP figure was found): treat as a single source per the\n"
+        "    base rules above; no GAAP-vs-non-GAAP comparison applies.\n"
     )
 
 
@@ -179,7 +211,7 @@ Constraints:
 
 # ---------------------------------------------------------------------------
 
-PROMPT_VERSION_CONFIDENCE = "v1"
+PROMPT_VERSION_CONFIDENCE = "v2"
 CONFIDENCE_SYSTEM = """\
 You are a financial-data confidence assessor. You score how trustworthy and
 internally coherent the data we hold on a company is — NOT whether the stock
@@ -192,7 +224,8 @@ numbers given and weigh/explain them. The four factors to assess:
 
   1. "Inter-document agreement" — within the latest filing, do the extracted
      metrics corroborate across ≥2 locations? Use the high/med/low conf tally
-     and whether validation passed / flagged a conflict.
+     and whether validation passed / flagged a conflict. Also weigh the
+     `eps_gap` field (see below).
   2. "Cross-source consistency" — across recent periods, are results
      continuous (no missing periods, no unexplained sign reversals) and drawn
      from multiple independent sources?
@@ -202,14 +235,29 @@ numbers given and weigh/explain them. The four factors to assess:
      with the direction implied by filings/news? Agreement raises confidence;
      divergence lowers it.
 
+EPS gap rules (factor 1 — `eps_gap` field inside `inter_document_agreement`):
+- `null` → the filing reports GAAP-only EPS. This is the cleanest case;
+  contributes positively. Target overall ≥75% when all other factors are also
+  clean.
+- present, `sign_flip: true` → CATASTROPHIC data-integrity signal: GAAP and
+  non-GAAP EPS disagree on direction (e.g. −$0.90 vs +$0.39). The validation
+  step will have flagged this as a conflict already. Target overall 20-40%.
+- present, `sign_flip: false`, `pct_diff` > 50 → material adjusted gap but
+  same sign. Lowers confidence moderately. Target 35-55%.
+- present, `sign_flip: false`, `pct_diff` ≤ 50 → routine adjusted EPS gap
+  (common at large operating companies). Mildly lowers confidence. Target
+  45-65%.
+
 Scoring rules:
 - Each factor gets a weight in [0,1]; weights should sum to ~1.
 - DOWN-WEIGHT the price-trend factor when price coverage is thin (low
   `data_points` / short `coverage_days`) — say so in that factor's detail.
 - `overall_pct` should reflect the weighted picture: strong agreement +
-  alignment ⇒ high; conflicts, gaps, or divergence ⇒ low.
+  alignment ⇒ high; conflicts, gaps, or divergence ⇒ low. The EPS-gap
+  targets above are the dominant lever — respect them.
 - Be specific and transparent: every factor `detail` must cite the actual
-  numbers you were given. No filler adjectives.
+  numbers you were given (including any `eps_gap` GAAP and non-GAAP values).
+  No filler adjectives.
 - The `summary` is 1-2 sentences naming the biggest drivers of the score.
 """
 

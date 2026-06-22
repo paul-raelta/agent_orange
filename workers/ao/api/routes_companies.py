@@ -11,8 +11,13 @@ from ao.api.deps import current_user_id, get_db
 from ao.api.serializers import serialize_companies, serialize_company
 from ao.data.sp500_seed import SP500_SEED
 from ao.db import models as m
+from ao.integrations.cik_resolver import resolve_cik
+from ao.integrations.finnhub_client import company_profile
+from ao.logging import get_logger
 from ao.notify import dispatcher
 from ao.notify.events import Event
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -78,6 +83,19 @@ async def add_companies_batch(
             if ir_url else f"investors.{ticker.lower()}.com"
         )
 
+        cik = await resolve_cik(ticker)
+        if cik is None:
+            log.warning("cik.unresolved", ticker=ticker)
+        sec_label = (
+            f"EDGAR · CIK {cik}" if cik else f"EDGAR · search “{ticker}”"
+        )
+
+        # Best-effort logo fetch. Finnhub /stock/profile2 returns a CDN URL
+        # on static.finnhub.io; an empty / failed response just falls through
+        # to None and the UI renders the 2-letter monogram.
+        profile = await company_profile(ticker)
+        logo_url = (profile or {}).get("logo") or None
+
         company = m.Company(
             user_id=user_id,
             ticker=ticker,
@@ -88,7 +106,9 @@ async def add_companies_batch(
             fiscal_note="",
             status="watching",
             source_mode="auto",
+            cik=cik,
             ir_url=ir_url or None,
+            logo_url=logo_url,
         )
         db.add(company)
         await db.flush()  # assign company.id so Source FKs resolve
@@ -100,7 +120,7 @@ async def add_companies_batch(
             ),
             m.Source(
                 company_id=company.id, kind="SEC",
-                label=f"EDGAR · search “{ticker}”",
+                label=sec_label,
             ),
         ])
 
@@ -340,11 +360,6 @@ async def delete_company(
     plus review_candidates → review_items → results (metrics cascade) →
     filings → provenance → prices → news → insider_tx → agent_runs.
     """
-    if ticker.upper() == "NVDA":
-        raise HTTPException(
-            409,
-            "NVDA is the demo anchor and can't be permanently deleted. Archive is allowed.",
-        )
     row = await _load(db, user_id, ticker)
     if row.archived_at is None:
         raise HTTPException(

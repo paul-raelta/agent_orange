@@ -28,6 +28,20 @@ PERIODIC_FORMS = {"10-Q", "10-K"}  # full income statement → reliable extracti
 EARNINGS_FORMS = PERIODIC_FORMS | {"8-K"}  # 8-K-2.02 is also valid but rare
 
 
+def _derive_period_label(form_type: str, period_of_report_iso: str) -> str:
+    """E.g. ('10-Q', '2025-09-30') -> 'Q3 2025'; ('10-K', '2025-12-31') -> 'FY2025'."""
+    if not period_of_report_iso:
+        return form_type
+    try:
+        dt = datetime.strptime(period_of_report_iso, "%Y-%m-%d")
+    except ValueError:
+        return form_type
+    if form_type == "10-K":
+        return f"FY{dt.year}"
+    quarter = (dt.month - 1) // 3 + 1
+    return f"Q{quarter} {dt.year}"
+
+
 async def poll_company(
     session: AsyncSession, user_id: str, company: m.Company
 ) -> m.Filing | None:
@@ -74,6 +88,7 @@ async def poll_company(
     accs = recent.get("accessionNumber", [])
     dates = recent.get("filingDate", [])
     primary_docs = recent.get("primaryDocument", [])
+    periods_of_report = recent.get("periodOfReport", [])
 
     # Prefer 10-Q / 10-K (have the full income statement Opus needs) over 8-K
     # (mostly material-event announcements; only the rare 8-K-2.02 is earnings).
@@ -97,6 +112,9 @@ async def poll_company(
     accession = accs[target_idx]
     filing_date = dates[target_idx]
     primary = primary_docs[target_idx] if target_idx < len(primary_docs) else ""
+    period_of_report = (
+        periods_of_report[target_idx] if target_idx < len(periods_of_report) else ""
+    )
 
     # Skip if we already have this accession.
     existing = (await session.execute(
@@ -114,7 +132,9 @@ async def poll_company(
     # New filing! Create the row.
     filing = m.Filing(
         id=uuid4().hex, company_id=company.id,
-        form_type=forms[target_idx], period="?", period_end=filing_date,
+        form_type=forms[target_idx],
+        period=_derive_period_label(forms[target_idx], period_of_report),
+        period_end=period_of_report or filing_date,
         reported_on=filing_date, accession=accession, source_url=primary,
         discovered_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
