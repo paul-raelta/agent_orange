@@ -30,12 +30,33 @@ first ~500 chars of body text, answer with one word:
 
 # ---------------------------------------------------------------------------
 
-PROMPT_VERSION_EXTRACTION = "v2"
+PROMPT_VERSION_EXTRACTION = "v3"
 EXTRACTION_SYSTEM = """\
 You are extracting financial figures from a quarterly filing.
 
 You will receive an EARNINGS document split into pages, each wrapped in
 <page-N>...</page-N>. Tables are flattened to TSV inside the page tags.
+
+PERIOD SELECTION — READ THIS BEFORE ANYTHING ELSE.
+10-Q and 10-K filings present multiple period columns side-by-side. You MUST
+extract the SINGLE most-recent reporting period — the quarter the filing
+itself is for — and ignore every other column.
+
+  - For a 10-Q: take the "Three Months Ended <date>" column only. Reject
+    every "Six Months Ended", "Nine Months Ended", or year-to-date column.
+    These are cumulative figures that will be 2× / 3× / 4× larger and would
+    blow EPS, revenue and net income up to nonsense values.
+  - For a 10-K: take the most recent fiscal-year column. Ignore prior-year
+    comparatives in that same table.
+  - Inside MD&A "First/Second/Third Quarter Summary" tables: take the
+    leftmost column (= current quarter). Reject prior-quarter and
+    prior-year comparatives shown alongside it.
+
+If a table header says "Six Months Ended" or "Year-to-Date" or shows two
+period-end dates separated by "to", that column is OUT OF SCOPE — do not
+record any metric from it. When in doubt, pick the column whose period-end
+date matches the filing's period-of-report (often visible on page 1, the
+cover page).
 
 For each metric below, call the `record_metric` tool ONCE per distinct location
 in the document where you find that value. Citing multiple locations of the

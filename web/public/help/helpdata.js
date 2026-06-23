@@ -23,7 +23,7 @@ window.HELP_SECTIONS = [
     { n: 9, x: 8,  y: 94 },
   ],
   callouts: [
-    { n: 1, title: 'Sidebar navigation', text: 'Jump between the seven views. The <b>Review</b> item shows a live blue badge when findings need your decision.' },
+    { n: 1, title: 'Sidebar navigation', text: 'Jump between the in-app views — Watchlist, Timeline, Review, Companies, Activity, Settings — plus <b>Help</b> and <b>Roadmap</b> (future features under discussion) at the bottom. The <b>Review</b> item shows a live blue badge when findings need your decision.' },
     { n: 2, title: 'Status summary', text: 'One line telling you how many agents are running, watching, awaiting review, and validated.' },
     { n: 3, title: 'Run all agents', text: 'Kicks off every agent at once and opens the Document Examiner (see §9). Use it to force a fresh check.' },
     { n: 4, title: 'Company card', text: 'One per tracked company. The coloured bar on its left edge encodes status at a glance.' },
@@ -37,6 +37,7 @@ window.HELP_SECTIONS = [
     'Scan the status chips to see what needs attention.',
     'Click any card to open that company’s deep-dive.',
     'Press <b>Run all agents</b> to check every company for new filings now.',
+    'Hover any number, chip or column header — the app explains what each one means inline (native browser tooltips).',
   ],
 },
 
@@ -61,7 +62,7 @@ window.HELP_SECTIONS = [
     { n: 1, title: 'Back link', text: 'Returns you to wherever you came from (Watchlist, Timeline, Review…).' },
     { n: 2, title: 'Company header', text: 'Ticker, sector, reporting cadence, live price, and the current status chip.' },
     { n: 3, title: 'Sources', text: 'Where this agent looks: the company IR site (marked <b>primary</b>) and SEC EDGAR with its CIK. The mode (auto / guided / advanced) is shown at the right.' },
-    { n: 4, title: 'Tabs', text: 'Results · Validation · Agent runs — plus News & Insider in the live app.' },
+    { n: 4, title: 'Tabs', text: 'Results · Validation · Agent runs — plus News, Insider, and (when Labs is on) Guidance in the live app.' },
     { n: 5, title: 'Latest period', text: 'The most recent quarter is highlighted with a faint orange tint so it stands out from history.' },
     { n: 6, title: 'Results table', text: 'Revenue, net income, EPS (basic & diluted), and margin across the last five periods.' },
     { n: 7, title: 'Confidence row', text: 'A confidence badge per period. Click the latest one to open the Provenance drawer (§3).' },
@@ -71,7 +72,12 @@ window.HELP_SECTIONS = [
     'Read across a row to see a metric’s trend over five periods.',
     'Switch to the <b>Validation</b> tab to see whether each figure was corroborated.',
     'Click a confidence badge to trace any number back to its source.',
+    'Scroll down to <b>Data sources · per-company</b> to override the global source toggles for this ticker, or paste an <b>IR URL</b> the agent should use as primary.',
+    'Use <b>ARCHIVE</b> in the header to take a company off the watchlist without losing its data — restore from <b>Companies</b> later, or permanently delete from there.',
   ],
+  note: `Archived companies stop being polled by the schedulers (prices, news, insider, filings) but their history is preserved
+    until you permanently delete them from <b>Companies → Archived</b>. NVDA is the demo anchor and can be archived but never
+    hard-deleted.`,
 },
 
 /* ───────────────── 3 · VALIDATION & PROVENANCE ───────────────── */
@@ -220,13 +226,17 @@ window.HELP_SECTIONS = [
     { n: 6, title: 'Select all', text: 'Add an entire sector’s companies at once.' },
     { n: 7, title: 'Company card', text: 'Monogram, ticker, name, live price, market cap, and next-earnings date.' },
     { n: 8, title: 'Selection checkbox', text: 'Click a card to select it; a running tray (not shown) tracks your picks and the ADD button.' },
-    { n: 9, title: 'Already tracking', text: 'Companies already on your watchlist are marked and can’t be added twice.' },
+    { n: 9, title: 'Already tracking', text: 'Companies already on your watchlist are marked and can’t be added twice. Archived rows count too — restore from the ARCHIVED panel rather than re-adding.' },
   ],
   howto: [
     'Search or filter to find companies, then click to select them.',
     'Use “Select all” to grab a whole sector at once.',
     'Press <b>Add</b> — the agents discover each company’s sources, then you confirm to start watching.',
+    'Toggle <b>ARCHIVED (N)</b> in the Companies header to see archived rows — RESTORE brings them back, PERMANENTLY DELETE wipes their history (double-confirm).',
+    'With <b>Demo mode</b> on, rows with cached extractions show a <b>DEMO READY</b> chip — adding one and running pipelines costs $0.',
   ],
+  note: `The demo anchor ticker (NVDA) is always present after a wipe. You can archive it but the PERMANENTLY DELETE
+    button is hidden — the app always boots with at least one ticker to demo against.`,
 },
 
 /* ───────────────────────── 7 · ACTIVITY ───────────────────────── */
@@ -277,7 +287,7 @@ window.HELP_SECTIONS = [
     { n: 1, title: 'Usage this month', text: 'Spend versus budget, with tokens and run counts — your cost dashboard.' },
     { n: 2, title: 'Budget bar', text: 'A visual gauge so you never blow past your monthly cap unnoticed.' },
     { n: 3, title: 'Per-model breakdown', text: 'How much each model cost and which tasks it handled.' },
-    { n: 4, title: 'Providers', text: 'Anthropic Claude (active) plus planned OpenAI & Google — the provider-agnostic seam.' },
+    { n: 4, title: 'Providers', text: 'Anthropic Claude (active) plus planned OpenAI & Google Gemini — the provider-agnostic seam.' },
     { n: 5, title: 'Planned providers', text: 'Add an API key to enable others later; the UI never hardcodes one vendor.' },
     { n: 6, title: 'Model routing', text: 'Assign a model per task: discovery, monitoring, extraction, validation.' },
     { n: 7, title: 'Segmented control', text: 'Pick Haiku / Sonnet / Opus per task — cheap for polling, strong where accuracy matters.' },
@@ -286,18 +296,26 @@ window.HELP_SECTIONS = [
     'Set your monthly budget and watch the usage bar.',
     'Route inexpensive models to discovery & monitoring.',
     'Reserve the strongest model for extraction & validation.',
+    'Toggle <b>Demo mode</b> to replay cached extractions ($0 / run) — pipelines skip Anthropic and re-use fixtures saved on the last real run.',
+    'Toggle data sources on/off, add a custom HTTPS feed (SSRF-guarded), or suggest one — under <b>Data sources</b>.',
+    'Tune <b>Validation thresholds</b> (EPS, margin %, revenue %) — figures outside the band route to Review.',
   ],
-  note: `The live app adds more panels here — <b>Notifications</b> (email/SMS triggers), <b>Run-all feedback</b>,
-    a <b>first-time reset</b>, and the <b>Labs feature flags</b> covered in §10.`,
+  note: `The live app stacks more panels below: <b>Demo mode</b> (zero-cost replay), <b>Notifications</b>
+    (email + SMS per-event opt-in), <b>Data sources</b> (built-ins + user-added feeds, with test/toggle/suggest),
+    <b>Validation thresholds</b>, <b>Run-all feedback</b>, the <b>Labs feature flags</b> covered in §10, and a
+    <b>First-time experience reset</b> that wipes every tracked company + their fetched data (NVDA remains as the
+    demo anchor).`,
 },
 
 /* ──────────────── 9 · DOCUMENT EXAMINER (diagram) ──────────────── */
 {
   id: 'examiner', num: '09', title: 'The Document Examiner', tagline: 'Watch the agents read', type: 'diagram',
   intro: `Pressing <b>Run all agents</b> opens the centrepiece: a full-screen sequence where the <b>document is
-    the hero</b>. Rather than an abstract progress bar, you watch each agent actually read the filing — opening
+    the hero</b>. Rather than an abstract progress bar, you watch the agent actually read the filing — opening
     the paper, zooming to each figure, circling it, and pulling it into an evidence panel with its provenance.
-    It runs through every tracked company in turn, then returns you to the Watchlist.`,
+    The hero ticker (NVDA by default) plays the full chapter; every other watchlisted ticker shows up on the
+    <b>background tasks</b> rail beneath the brand line, with its real Finnhub quote / news / insider refresh
+    ticking from <b>refreshing…</b> to <b>✓ done</b> while the document chapter plays out.`,
   pipeline: [
     { k: 'DISCOVER', d: 'Find the filing on SEC EDGAR + the IR site.' },
     { k: 'FETCH', d: 'Open it as real “paper” — 10-Q cover, income statement, press release.' },
@@ -310,6 +328,7 @@ window.HELP_SECTIONS = [
     { title: 'Extracted Data panel', text: 'Each figure the agent captures lands here with its source and confidence, building up as it reads.' },
     { title: 'Telemetry rail', text: 'Live counters — pages read, tables parsed, figures captured, sources cross-referenced, model spend — plus elapsed time and the pipeline stage.' },
     { title: 'Per-company progress', text: 'A rail shows which company is being examined and how many remain; it ends with an “Examination complete” summary.' },
+    { title: 'Background tasks rail', text: 'Below the brand line — one pill per non-hero ticker (e.g. AAPL · quote · news · insider). Flips from <b>refreshing</b> to <b>✓ done</b> while the document examiner plays the lead chapter.' },
     { title: 'Minimise & keep working', text: 'Press ▾ to dock the run as a small live widget (bottom-right) and keep using the app; ⤢ expands back to the full view. The run continues in the background.' },
   ],
   howto: [

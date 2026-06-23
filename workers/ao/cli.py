@@ -274,6 +274,7 @@ def force_run(ticker: str) -> None:
                 validation_detail=verdict.detail if verdict else "",
                 validation_corroborations=verdict.corroborations if verdict else 0,
                 validation_conflict=bool(verdict and verdict.conflict),
+                validation_demo_synthetic=bool(verdict and getattr(verdict, "demo_synthetic", False)),
                 narrative=story, is_latest=True,
             )
             session.add(result)

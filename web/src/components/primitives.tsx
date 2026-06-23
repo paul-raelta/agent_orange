@@ -7,10 +7,21 @@ import { STATUS, type Status } from './status'
 import { usePriceFlash } from '../motion/motion'
 
 /* Status chip for an agent / company */
+const STATUS_TIPS: Record<Status, string> = {
+  validated:
+    'Latest filing extracted, cross-checked across sources, no conflicts. Numbers are trusted.',
+  review:
+    'A figure couldn\'t be auto-validated (e.g. GAAP vs non-GAAP EPS disagree). Open Review queue to resolve.',
+  watching:
+    'No new filing yet. Agents are watching EDGAR + IR for the next quarterly disclosure.',
+  error:
+    'Pipeline run failed for this company. Check Agent Runs on the company page for the exception.',
+}
+
 export function StatusChip({ status, pulse }: { status: Status; pulse?: boolean }) {
   const s = STATUS[status] || STATUS.watching
   return (
-    <span className={'chip ' + s.cls}>
+    <span className={'chip ' + s.cls} title={STATUS_TIPS[status] || STATUS_TIPS.watching}>
       <span
         className={'chip-dot' + (pulse && status === 'watching' ? ' pulse' : '')}
         style={{ background: s.dot }}
@@ -21,6 +32,12 @@ export function StatusChip({ status, pulse }: { status: Status; pulse?: boolean 
 }
 
 /* Confidence badge: high / med / low (3-bar glyph + label) */
+const CONF_TIPS: Record<ConfLevel, string> = {
+  high: 'HIGH confidence — number was found in multiple agreeing sources (filing + IR / press / XBRL).',
+  med: 'MED confidence — found in one source or two with minor disagreement on rounding.',
+  low: 'LOW confidence — found in only one source or sources disagree. Treat the number with caution.',
+}
+
 export function Conf({ level, onClick }: { level: ConfLevel; onClick?: () => void }) {
   const map: Record<ConfLevel, [string, string]> = {
     high: ['HIGH', 'cf-high'],
@@ -28,11 +45,12 @@ export function Conf({ level, onClick }: { level: ConfLevel; onClick?: () => voi
     low: ['LOW', 'cf-low'],
   }
   const [lab, cls] = map[level] || map.med
+  const tip = (CONF_TIPS[level] || CONF_TIPS.med) + (onClick ? ' Click for the sources.' : '')
   return (
     <button
       className={'conf ' + cls + (onClick ? ' conf-btn' : '')}
       onClick={onClick}
-      title="Confidence — click for sources"
+      title={tip}
     >
       <span className="conf-bars">
         <i className="on" />
@@ -87,11 +105,31 @@ export function ConfidenceGauge({
   const r = (size - stroke) / 2
   const circ = 2 * Math.PI * r
   const dash = (Math.max(0, Math.min(100, pct)) / 100) * circ
+  const bandLabel = BAND_LABEL[confidence.band] || confidence.band
+  // Top driver = highest-weight factor, breaking ties toward non-neutral impact.
+  const factors = confidence.factors || []
+  const topFactor = factors.length
+    ? [...factors].sort((a, b) => {
+        if (b.weight !== a.weight) return b.weight - a.weight
+        const aN = a.impact === 'neutral' ? 1 : 0
+        const bN = b.impact === 'neutral' ? 1 : 0
+        return aN - bN
+      })[0]
+    : null
+  const driverLine = topFactor
+    ? ` Main driver — ${topFactor.name} (${topFactor.impact}): ${topFactor.detail}`
+    : ''
+  const tip =
+    `Financial confidence · ${pct}% (${bandLabel}) — how trustworthy the data ` +
+    'we hold is. Blends inter-document agreement, source consistency, ' +
+    'insider / news signal and price-trend alignment.' +
+    driverLine +
+    ' Click for the full breakdown.'
   return (
     <button
       className={'confg' + (compact ? ' confg-compact' : '') + (onClick ? ' confg-btn' : '')}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
-      title="Financial confidence — click for the breakdown"
+      title={tip}
       style={{ ['--cf' as string]: color }}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="confg-ring">
@@ -262,10 +300,19 @@ export function Btn({
 export function Price({ price, change }: { price: number; change: number }) {
   const up = change >= 0
   const flash = usePriceFlash(price)
+  const dirWord = up ? 'up' : 'down'
   return (
     <span className="price">
-      <span className={'price-val ' + flash}>{price.toFixed(2)}</span>
-      <span className={'price-chg ' + (up ? 'delta-up' : 'delta-down')}>
+      <span
+        className={'price-val ' + flash}
+        title={`Last share price · $${price.toFixed(2)}`}
+      >
+        {price.toFixed(2)}
+      </span>
+      <span
+        className={'price-chg ' + (up ? 'delta-up' : 'delta-down')}
+        title={`Today's move vs prior close — ${dirWord} ${Math.abs(change).toFixed(2)}%. Refreshed every 5 min during market hours.`}
+      >
         {up ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
       </span>
     </span>

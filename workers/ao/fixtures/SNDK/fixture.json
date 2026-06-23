@@ -2,105 +2,143 @@
   "extraction": [
     {
       "key": "Revenue",
-      "display_value": "$1.95B",
-      "raw_value": 1950,
-      "page": 1,
-      "quote": "Revenue of $1.95 billion. GAAP net income of $0.82 per diluted share.",
-      "source_label": "Press release \u2014 fiscal Q4 results",
+      "display_value": "$5.95B",
+      "raw_value": 5950,
+      "page": 5,
+      "quote": "Revenue, net $ 5,950 \u00b7 Net income (loss) $ 3,615 \u00b7 Net income per common share \u2014 Basic $ 24.43 \u00b7 Diluted $ 23.03",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Operations",
       "verified": true
     },
     {
       "key": "Net income",
-      "display_value": "$118M",
-      "raw_value": 118,
-      "page": 11,
-      "quote": "Diluted net income per share $0.79 \u2014 figure differs from press-release headline ($0.82) by $0.03; reconciliation references non-GAAP adjustments.",
-      "source_label": "8-K Exhibit 99.1 \u2014 financial schedules",
+      "display_value": "$3.62B",
+      "raw_value": 3615,
+      "page": 5,
+      "quote": "Revenue, net $ 5,950 \u00b7 Net income (loss) $ 3,615 \u00b7 Net income per common share \u2014 Basic $ 24.43 \u00b7 Diluted $ 23.03",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Operations",
       "verified": true
     },
     {
       "key": "EPS \u00b7 diluted",
-      "display_value": "$0.82",
-      "raw_value": 0.82,
+      "display_value": "$23.03",
+      "raw_value": 23.03,
+      "page": 5,
+      "quote": "Revenue, net $ 5,950 \u00b7 Net income (loss) $ 3,615 \u00b7 Net income per common share \u2014 Basic $ 24.43 \u00b7 Diluted $ 23.03",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Operations",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$23.03",
+      "raw_value": 23.03,
+      "page": 13,
+      "quote": "Basic $ 24.43 Diluted $ 23.03 \u2014 Weighted average shares outstanding: Basic 148, Diluted 157.",
+      "source_label": "10-Q \u00b7 Note 5 \u2014 Net Income (Loss) Per Common Share",
+      "verified": true
+    },
+    {
+      "key": "EPS \u00b7 diluted",
+      "display_value": "$24.15",
+      "raw_value": 24.15,
       "page": 1,
-      "quote": "Revenue of $1.95 billion. GAAP net income of $0.82 per diluted share.",
-      "source_label": "Press release \u2014 fiscal Q4 results",
+      "quote": "Reconciliation of GAAP to non-GAAP results \u2014 adjusted diluted EPS $24.15 (excludes stock-based compensation and integration charges). [Synthetic value injected for demo purposes only \u2014 not present in the underlying 10-Q.]",
+      "source_label": "Press release \u00b7 adjusted diluted EPS (demo synthetic)",
       "verified": true
     },
     {
-      "key": "EPS \u00b7 diluted",
-      "display_value": "$0.79",
-      "raw_value": 0.79,
-      "page": 11,
-      "quote": "Diluted net income per share $0.79 \u2014 figure differs from press-release headline ($0.82) by $0.03; reconciliation references non-GAAP adjustments.",
-      "source_label": "8-K Exhibit 99.1 \u2014 financial schedules",
+      "key": "EPS \u00b7 basic",
+      "display_value": "$24.43",
+      "raw_value": 24.43,
+      "page": 5,
+      "quote": "Revenue, net $ 5,950 \u00b7 Net income (loss) $ 3,615 \u00b7 Net income per common share \u2014 Basic $ 24.43 \u00b7 Diluted $ 23.03",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Operations",
+      "verified": true
+    },
+    {
+      "key": "Gross margin",
+      "display_value": "78.4%",
+      "raw_value": 78.4,
+      "page": 28,
+      "quote": "Gross profit 4,662 78.4 382 22.5",
+      "source_label": "10-Q \u00b7 MD&A \u00b7 Results of Operations",
       "verified": true
     }
   ],
   "filing": {
-    "form_type": "8-K",
-    "period": "Fiscal Q4 '26",
-    "period_end": "2026-06-27",
-    "reported_on": "2026-07-30",
-    "accession": "0002023554-26-000019",
+    "form_type": "10-Q",
+    "period": "Fiscal Q3 '26",
+    "period_end": "2026-04-03",
+    "reported_on": "2026-05-08",
+    "accession": "0001628280-26-029401",
     "source_url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0002023554"
   },
   "validation": {
     "passed": false,
     "rule": "Cross-reference EPS in \u22652 locations",
-    "detail": "Press release headline reports diluted EPS $0.82, but the 8-K financial schedule (p.11) shows $0.79. Difference attributed to non-GAAP adjustments \u2014 needs human decision on which figure to record.",
+    "detail": "Income statement (p.5) and Note 5 (p.13) both report diluted EPS $23.03 (GAAP). The press-release reconciliation reports adjusted diluted EPS $24.15 \u2014 a $1.12 GAAP/non-GAAP gap. Routed to REVIEW.",
     "corroborations": 2,
     "conflict": true,
+    "demo_synthetic": true,
     "per_metric": [
       {
         "key": "Revenue",
         "conf": "high",
-        "accept_value": "$1.95B"
+        "accept_value": "$5.95B"
       },
       {
         "key": "Net income",
-        "conf": "med",
-        "accept_value": "$118M"
+        "conf": "high",
+        "accept_value": "$3.62B"
       },
       {
         "key": "EPS \u00b7 diluted",
         "conf": "low",
-        "accept_value": "$0.82",
-        "reason": "GAAP/non-GAAP gap \u2014 press release $0.82 vs 8-K schedule $0.79.",
+        "accept_value": "$23.03",
+        "reason": "GAAP/non-GAAP gap \u2014 GAAP $23.03 (10-Q schedules) vs adjusted $24.15 (press release). [demo synthetic \u2014 see Validation tab for context]",
         "alternative_values": [
           {
-            "value": "$0.82",
-            "source": "Press release headline",
-            "page": 1
+            "value": "$23.03",
+            "source": "10-Q \u00b7 income statement (p.5) + Note 5 (p.13)",
+            "page": 5
           },
           {
-            "value": "$0.79",
-            "source": "8-K Exhibit 99.1 (p.11)",
-            "page": 11
+            "value": "$24.15",
+            "source": "Press release \u00b7 adjusted diluted EPS (demo synthetic)",
+            "page": 1
           }
         ]
+      },
+      {
+        "key": "EPS \u00b7 basic",
+        "conf": "high",
+        "accept_value": "$24.43"
+      },
+      {
+        "key": "Gross margin",
+        "conf": "med",
+        "accept_value": "78.4%"
       }
     ]
   },
-  "narrative": "",
+  "narrative": "Fiscal Q3 '26 GAAP diluted EPS $23.03 vs adjusted $24.15 \u2014 $1.12 gap routed for human review. Revenue $5.95B (3.5\u00d7 YoY) and gross margin 78.4% (up from 22.5%) both validate cleanly across the underlying schedules.",
   "confidence": {
     "overall_pct": 35,
     "band": "low",
-    "summary": "Diluted EPS disagrees across sources by $0.03; press release headline figure conflicts with the 8-K schedule.",
+    "summary": "Diluted EPS conflict between GAAP schedules and the adjusted press-release figure. The other metrics corroborate cleanly.",
     "factors": [
       {
         "name": "Inter-document agreement",
         "weight": 0.4,
         "impact": "negative",
-        "signal": "EPS conflict: $0.82 (press) vs $0.79 (schedule).",
+        "signal": "EPS conflict: $23.03 (10-Q) vs $24.15 (press release adjusted).",
         "detail": "Routed to review queue \u2014 no auto-resolution."
       },
       {
         "name": "Cross-period consistency",
         "weight": 0.2,
         "impact": "neutral",
-        "signal": "Revenue trend stable; net income broadly in line.",
-        "detail": "Only the EPS line shows divergence."
+        "signal": "Revenue and basic EPS trend stable; only diluted shows divergence.",
+        "detail": "Disagreement is isolated to the diluted-EPS row."
       },
       {
         "name": "Insider and news",
@@ -113,8 +151,8 @@
         "name": "Price-trend alignment",
         "weight": 0.2,
         "impact": "negative",
-        "signal": "Price slope negative \u2014 market discounted the EPS figure.",
-        "detail": "Drift reflects uncertainty around the GAAP/non-GAAP gap."
+        "signal": "Price slope negative \u2014 market discounted the gap.",
+        "detail": "Uncertainty around GAAP/non-GAAP framing weighs on the stock."
       }
     ]
   }

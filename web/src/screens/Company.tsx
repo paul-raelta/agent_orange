@@ -40,6 +40,21 @@ type Tab =
   | (typeof BASE_TABS)[number]
   | 'guidance'
 
+const TAB_TIPS: Record<Tab, string> = {
+  results:
+    'Reported figures by quarter — revenue, net income, EPS and margins extracted from each 10-Q / 10-K.',
+  validation:
+    'How well each headline number was cross-checked across sources. Conflicts route to the REVIEW queue.',
+  guidance:
+    'Forward outlook (next quarter / full year) extracted from press releases and earnings calls. LABS feature.',
+  news:
+    'Recent headlines for this ticker — last 30 days, refreshed every 30 min from Finnhub.',
+  insider:
+    'Form 4 filings — officer / director / 10% holder buys and sells, newest first.',
+  'agent runs':
+    'Per-stage agent run log for this company (monitor → extract → validate → narrative → confidence).',
+}
+
 const ROWS: [string, keyof HistoryRow][] = [
   ['Revenue', 'rev'],
   ['Net income', 'ni'],
@@ -175,14 +190,32 @@ export function Company() {
       </div>
 
       <div className="co-srcrow">
-        <span className="lbl">SOURCES</span>
+        <span
+          className="lbl"
+          title="Data sources the agents fetch from for this company. Primary = the canonical source the extractor reads first."
+        >
+          SOURCES
+        </span>
         {c.sources.map((s) => (
-          <span key={s.label} className={'src-pill' + (s.primary ? ' primary' : '')}>
+          <span
+            key={s.label}
+            className={'src-pill' + (s.primary ? ' primary' : '')}
+            title={`${s.kind} source · ${s.label}${s.primary ? ' (primary)' : ''}`}
+          >
             <b>{s.kind}</b> {s.label}
             {s.primary ? ' · primary' : ''}
           </span>
         ))}
-        <span className="src-mode">mode: {c.sourceMode}</span>
+        <span
+          className="src-mode"
+          title={
+            c.sourceMode === 'auto'
+              ? 'Source mode: AUTO — agent discovers IR + SEC sources automatically.'
+              : 'Source mode: ' + c.sourceMode
+          }
+        >
+          mode: {c.sourceMode}
+        </span>
       </div>
 
       <Panel title="DATA SOURCES · per-company">
@@ -261,7 +294,10 @@ export function Company() {
       </Panel>
 
       {c.narrative && (
-        <div className="ai-narrative">
+        <div
+          className="ai-narrative"
+          title="AI-written 2-3 sentence summary of the headline takeaways from this filing, capped at 200 tokens. Generated after extraction + validation."
+        >
           <span className="ai-narrative-lbl">WHAT'S WORTH KNOWING</span>
           <p className="ai-narrative-text">{c.narrative}</p>
         </div>
@@ -323,6 +359,7 @@ export function Company() {
               'tab' + (tab === t ? ' active' : '') + (t === 'guidance' ? ' tab-new' : '')
             }
             onClick={() => setTab(t)}
+            title={TAB_TIPS[t]}
           >
             {t.toUpperCase()}
           </button>
@@ -340,11 +377,16 @@ export function Company() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th className="sticky-col">METRIC</th>
+                    <th
+                      className="sticky-col"
+                      title="Headline GAAP figure extracted from the filing. Click a confidence badge below to see exactly where each number was read."
+                    >
+                      METRIC
+                    </th>
                     {flags.consensus && (
                       <th
                         className="num cons-col"
-                        title="Consensus — Wall Street estimate for this metric"
+                        title="CONSENSUS — the average Wall Street analyst estimate for this metric ahead of the print."
                       >
                         CONS
                       </th>
@@ -352,13 +394,22 @@ export function Company() {
                     {flags.consensus && (
                       <th
                         className="num"
-                        title="Surprise % — (actual − estimate) / |estimate| × 100. Positive = beat, negative = miss."
+                        title="SURPRISE % — (actual − estimate) / |estimate| × 100. Above +0.5% = beat (green), below −0.5% = miss (red)."
                       >
                         SURP
                       </th>
                     )}
-                    {c.history.map((h) => (
-                      <th key={h.period}>
+                    {c.history.map((h, i) => (
+                      <th
+                        key={h.period}
+                        title={
+                          (i === 0 ? 'Latest reported period · ' : 'Prior period · ') +
+                          h.period +
+                          ' (ended ' +
+                          h.end +
+                          ')'
+                        }
+                      >
                         <div className="th-period">{h.period}</div>
                         <div className="th-end">{h.end}</div>
                       </th>
@@ -398,7 +449,12 @@ export function Company() {
                     )
                   })}
                   <tr>
-                    <td className="sticky-col rowlab dim">confidence</td>
+                    <td
+                      className="sticky-col rowlab dim"
+                      title="Per-metric extraction confidence (HIGH / MED / LOW) — derived from how many sources corroborate the number. Click a badge for the source quotes."
+                    >
+                      confidence
+                    </td>
                     {flags.consensus && <td className="num cons-col">—</td>}
                     {flags.consensus && <td className="num">—</td>}
                     {c.history.map((h, i) => (
@@ -442,18 +498,51 @@ export function Company() {
         <Panel title="VALIDATION — latest period">
           <div className={'val-card ' + (L.validation.passed ? 'pass' : 'fail')}>
             <div className="val-top">
-              <span className={'val-badge ' + (L.validation.passed ? 'pass' : 'fail')}>
+              <span
+                className={'val-badge ' + (L.validation.passed ? 'pass' : 'fail')}
+                title={
+                  L.validation.passed
+                    ? 'All extracted figures cleared the validation rule and corroborate across sources.'
+                    : 'A figure failed the validation rule — open the Review queue to pick the correct value.'
+                }
+              >
                 {L.validation.passed ? '✓ PASSED' : '⚑ NEEDS REVIEW'}
               </span>
-              <span className="val-rule">rule · {L.validation.rule}</span>
+              <span
+                className="val-rule"
+                title="The validation rule the extractor ran — checks GAAP / non-GAAP consistency and cross-source agreement."
+              >
+                rule · {L.validation.rule}
+              </span>
             </div>
             <p className="val-detail">{L.validation.detail}</p>
             <div className="val-meta">
-              <span>{L.validation.corroborations} corroborating source(s)</span>
+              <span
+                title="How many distinct sources reported a matching figure for the headline metrics."
+              >
+                {L.validation.corroborations} corroborating source(s)
+              </span>
               {L.validation.conflict && (
-                <span className="val-conflict">value conflict detected</span>
+                <span
+                  className="val-conflict"
+                  title="At least one metric was reported differently across sources (e.g. GAAP vs non-GAAP EPS). Routed to REVIEW."
+                >
+                  value conflict detected
+                </span>
               )}
             </div>
+            {L.validation.demoSynthetic && (
+              <div
+                className="val-demo-note"
+                title="This GAAP/non-GAAP conflict is fabricated in the demo fixture to exercise the REVIEW routing path. The underlying cached 10-Q has no such divergence — the extracted GAAP figures themselves are accurate."
+              >
+                <strong>DEMO ONLY · </strong>
+                this conflict is synthetic — injected by the fixture so the
+                REVIEW routing path stays demoable. The underlying 10-Q data
+                is fine; the press-release "adjusted EPS" line does not exist
+                in the real filing.
+              </div>
+            )}
           </div>
           <div className="metric-list">
             {L.metrics.map((m) => (
@@ -461,12 +550,16 @@ export function Company() {
                 className="metric-row"
                 key={m.key}
                 onClick={() => m.prov.length && setProv(m)}
+                title={m.prov.length ? 'Click to view the exact source quotes for ' + m.key : undefined}
               >
                 <span className="mr-key">{m.key}</span>
                 <span className="mr-val">{m.value}</span>
                 <Delta value={m.yoy} />
                 <Conf level={m.conf} onClick={m.prov.length ? () => setProv(m) : undefined} />
-                <span className="mr-prov">
+                <span
+                  className="mr-prov"
+                  title="Number of corroborating sources where this figure was found"
+                >
                   {m.prov.length} source{m.prov.length === 1 ? '' : 's'} ›
                 </span>
               </div>

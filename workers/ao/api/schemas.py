@@ -66,6 +66,7 @@ class Validation(WireBase):
     detail: str
     corroborations: int
     conflict: bool | None = None
+    demoSynthetic: bool = False
 
 
 ConfidenceBand = Literal["high", "medium", "low"]

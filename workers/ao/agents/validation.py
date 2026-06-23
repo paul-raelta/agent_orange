@@ -38,6 +38,7 @@ class ValidationOutput:
     corroborations: int
     conflict: bool
     per_metric: list[MetricVerdict]
+    demo_synthetic: bool = False
 
 
 def _default_rule() -> str:

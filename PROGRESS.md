@@ -1,5 +1,629 @@
 # PROGRESS — Agent Orange
 
+## Increment — pipeline.run_one is idempotent (no more bg_run.failed on re-runs)
+
+**Goal:** "Run All Agents" on Railway was dying with
+`duplicate key value violates unique constraint "uq_result_company_period"`
+on the second click, and the failure unwound the bg task **before** the
+notify dispatcher fired — so the user never got an SMS even though Twilio
++ NotificationPrefs were correctly configured.
+
+**Root cause:** `pipeline.run_one` unconditionally INSERTed a fresh
+`Result` row each call. The unique constraint on `(company_id, period)`
+guarantees one row per fiscal period, so a re-run always collided. Locally
+the same bug existed but hadn't been triggered because the demo seed
+state had only been re-run on tickers whose first run hadn't been clicked
+twice in succession.
+
+**What changed**
+
+- `workers/ao/agents/pipeline.py` — the Result + Metric + Provenance
+  persistence step is now an upsert keyed on `(company_id, period)`:
+  - SELECT the existing Result row first.
+  - If found, mutate its scalar fields in place, then DELETE the old
+    Metrics + their Provenance (no `ON DELETE CASCADE` at the DB level, so
+    children first) before the new Metrics get added.
+  - If not found, INSERT a new row as before.
+  - `prior_latest` demotion still runs in both branches (covers
+    sibling-period rows for the same company).
+  - On re-runs only, also delete unresolved ReviewItems + their
+    ReviewCandidates for this result_id before re-creating; resolved
+    items the user already decided on stay put.
+- `from sqlalchemy import delete` added.
+
+**Verification done**
+
+- `ao run NVDA` three times in a row → all succeed, Result id unchanged
+  (`bf2b5e22…`), `validated_on` advances each run, metrics=5 and
+  provenance=7 rebuilt cleanly, `notify.dispatch event_type=validated`
+  fires every time.
+- `ao run SNOW` (Filing.period literally `"10-Q"`, the exact prod
+  scenario that crashed) twice → both succeed, one Result row, validated
+  event dispatched both times.
+
+**Files touched**
+
+- `workers/ao/agents/pipeline.py`
+
+**Next step**
+
+Push to Railway; trigger "Run All Agents" twice from the production UI;
+expect the SMS to arrive (assuming `prefs.sms_enabled = true`,
+`prefs.on_validated = true`, and `TWILIO_*` env vars are populated). The
+existing `period="10-Q"` rows on the production Postgres are now updated
+in place — no manual cleanup of the prod DB required.
+
+---
+
+## Increment — confidence gauge tooltip now names the top driver
+
+**Goal:** the `Financial confidence · NN% (BAND)` hover tooltip on the
+ConfidenceGauge was a static blurb; it didn't tell you *why* the score is
+what it is. The user wanted a one-line verbal explanation of the biggest
+contributor — so a 35% SNDK hover tells you it's the GAAP/non-GAAP review-
+routing dragging it down, and an 87% NVDA hover tells you it's the
+three-source corroboration holding it up.
+
+**What changed**
+- `web/src/components/primitives.tsx` — `ConfidenceGauge` now computes
+  `topFactor` = the highest-weight entry in `confidence.factors`, breaking
+  ties toward non-neutral impacts so a 50/50 tie doesn't surface a "no
+  signal" row. Appends `Main driver — <name> (<impact>): <detail>` to the
+  tooltip. Falls back gracefully when `factors` is empty.
+
+**Where the data comes from**
+- `confidence.factors[]` is already populated by the confidence stage; each
+  factor carries `name`, `weight`, `impact` and a `detail` sentence that
+  the LLM is required to cite actual numbers in (`prompts.py:279-281`).
+  No new fields, no schema change, no backend touch — purely a UI surface.
+
+**Verification done**
+- `cd web && npm run build` → 111 modules, tsc + vite green.
+- Smoke-checked NVDA (87%) and SNDK (35%) fixture data: top factor is the
+  one whose direction matches the score, with a concrete one-line detail.
+
+**Files touched**
+- `web/src/components/primitives.tsx`
+
+**Next step**
+Visual QA: hover the confidence ring on `/company/NVDA` (expect a positive
+"Inter-document agreement" driver) and on `/company/SNDK` (expect a
+negative one citing the review routing). The same tooltip is shared with
+the watchlist compact gauges — that's fine, both surfaces benefit.
+
+---
+
+## Increment — consensus overrides for DIS and SNOW
+
+**Goal:** CONS / SURP cells were blank on the Disney and Snowflake company
+pages because `_OVERRIDES` in `workers/ao/integrations/consensus_provider.py`
+only had rows for NVDA / MU / SNDK. Per the existing "no synthetic
+consensus" contract, missing pairs return `None` and the UI hides the
+columns — which was correct behavior but undesirable for the demo.
+
+**What changed**
+- `workers/ao/integrations/consensus_provider.py` — added 9 override rows:
+  - DIS: Revenue / Net income / EPS diluted / EPS basic (no Gross margin in
+    fixture).
+  - SNOW: Revenue / Net income / EPS diluted / EPS basic / Gross margin.
+- SNOW posts a loss; the estimate is set more-negative than the actual so
+  the `(actual - est)/|est|` surprise formula yields a positive value (a
+  "beat" = smaller loss than expected). Labels authored verbatim ("-$305M",
+  "-$0.89") so the UI doesn't see `$-0.89`.
+
+**Calibration (actuals from the fixtures on disk)**
+- DIS Q2 FY26 — Rev $25.17B / NI $2.47B / EPS $1.27. Estimates land
+  Revenue +2.10%, Net income +3.14%, EPS +2.42%.
+- SNOW Q1 FY27 — Rev $1.39B / NI -$295.57M / EPS -$0.86 / GM 66.6%.
+  Estimates land Revenue +2.28%, Net income +3.09%, EPS +3.37%, GM +1.68%.
+
+**Verification done**
+- Inline `consensus_for(...)` smoke run for every (ticker, metric) pair
+  against the actuals: every surprise lands in +1.7% to +3.4%, matching
+  the modest-beat target used for NVDA / MU / SNDK.
+
+**Files touched**
+- `workers/ao/integrations/consensus_provider.py`
+
+**Next step**
+Open `/company/DIS` and `/company/SNOW` and confirm the QUARTERLY RESULTS
+table now renders CONS and SURP cells with the values above. If the
+cached filings for DIS or SNOW are ever re-extracted with different
+period selection, recalibrate these overrides the same way (target
++1–4% beats, keep estimate more negative than actual for loss metrics).
+
+---
+
+## Increment — SNDK demo conflict re-injected with "demo synthetic" UI notice
+
+**Goal:** keep the GAAP-vs-non-GAAP REVIEW-routing demo working for SNDK
+under the new "filing = truth" alignment, but make it obvious in the UI
+that the conflict is a fixture-only synthetic divergence and not a real
+issue with the underlying 10-Q data.
+
+**What changed**
+
+- `workers/scripts/export_seed_fixtures.py` — SNDK fixture gets a third
+  EPS·diluted extraction row sourced from a fabricated "Press release ·
+  adjusted diluted EPS (demo synthetic)" with value `$24.15`. Validation
+  flipped back to `passed=False, conflict=True`. New `demo_synthetic:
+  True` flag on the validation block.
+- `workers/ao/db/models.py` — `Result.validation_demo_synthetic`
+  Boolean column.
+- `workers/ao/db/engine.py` — added to `_COLUMN_MIGRATIONS` so existing
+  DBs self-heal.
+- `workers/ao/agents/validation.py` — `ValidationOutput.demo_synthetic:
+  bool = False` field on the dataclass.
+- `workers/ao/agents/demo_fixtures.py` — `to_validation_output` reads
+  the flag from the fixture JSON.
+- `workers/ao/agents/pipeline.py` — persists
+  `validation_demo_synthetic` on Result.
+- `workers/ao/cli.py` — same for the CLI run path.
+- `workers/ao/db/seed.py` — `_add_result` threads the flag through.
+- `workers/ao/api/schemas.py` — `Validation.demoSynthetic: bool = False`
+  on the wire schema.
+- `workers/ao/api/serializers.py` — serializer maps the flag through.
+- `web/src/types.ts` — `Validation.demoSynthetic?: boolean`.
+- `web/src/screens/Company.tsx` — Validation tab renders an amber-bordered
+  "DEMO ONLY" notice inside the val-card whenever `demoSynthetic=true`,
+  explaining the synthetic conflict and reassuring the user that the
+  10-Q itself is fine.
+- `web/src/styles/app.css` — `.val-demo-note` style (dashed amber
+  border, faded amber background, small caps treatment).
+- SNDK fixture also appends `[demo synthetic — see Validation tab for
+  context]` to the conflict reason text, so the marker also shows up on
+  the REVIEW screen inline next to the existing reason.
+
+**Verification done**
+- `python -m scripts.export_seed_fixtures` — rewrote all three.
+- `npm run build` — 111 modules, green.
+- ASGI smoke test against the live demo-mode pipeline:
+  - `POST /companies/SNDK/run` returns 200, demo replay runs.
+  - `GET /companies/SNDK` returns
+    `validation: {passed:false, conflict:true, demoSynthetic:true,
+    detail:"Income statement (p.5) and Note 5 (p.13) both report
+    diluted EPS $23.03 (GAAP). The press-release reconciliation
+    reports adjusted diluted EPS $24.15..."}`.
+  - `GET /review-queue` returns 1 SNDK item with
+    `reason: "GAAP/non-GAAP gap — ... [demo synthetic — see Validation
+    tab for context]"`.
+
+**Trade-off, documented**
+The SNDK fixture now intentionally diverges from what real Opus
+extraction would produce against the cached 10-Q on disk — there's no
+$24.15 adjusted EPS in the source file, so a `demo_mode=False` run on
+SNDK will validate cleanly (no conflict, no review item) instead. This
+divergence is the cost of keeping the REVIEW demo alive without editing
+the underlying HTML; the on-screen "DEMO ONLY" notice tells the user
+that's the case.
+
+**Files touched**
+- `workers/scripts/export_seed_fixtures.py`
+- `workers/ao/db/{models,engine,seed}.py`
+- `workers/ao/agents/{validation,demo_fixtures,pipeline}.py`
+- `workers/ao/cli.py`
+- `workers/ao/api/{schemas,serializers}.py`
+- `workers/ao/fixtures/SNDK/fixture.json` (regenerated)
+- `web/src/types.ts`
+- `web/src/screens/Company.tsx`
+- `web/src/styles/app.css`
+
+---
+
+## Increment — Option A: align seed fixtures + consensus to cached 10-Q filings
+
+**Goal:** make demo-mode replay and real (`demo_mode=False`) Anthropic
+extraction produce **the same numbers** for every demo ticker. Previously
+the seed-script payloads (notional pre-AI-era numbers) and the cached
+10-Q HTML files (simulated 2026-boom numbers) disagreed, so demo replay
+showed one set and a real extraction showed another.
+
+**Source of truth: the cached 10-Q files in `workers/var/cache/`.**
+
+**Actuals extracted from the cached filings**
+
+| Ticker | Period          | Revenue   | Net income | EPS dil. | EPS basic | GM    |
+|--------|-----------------|-----------|------------|----------|-----------|-------|
+| NVDA   | Q1 FY27 (Apr 26 '26) | $81.6B    | $58.32B    | $2.39    | $2.40     | 74.9% |
+| MU     | Q2 FY26 (Feb 26 '26) | $23.86B   | $13.79B    | $12.07   | $12.25    | 74.4% |
+| SNDK   | Fiscal Q3 '26 (Apr 3 '26) | $5.95B  | $3.62B   | $23.03   | $24.43    | 78.4% |
+
+**What changed**
+- `workers/scripts/export_seed_fixtures.py` — NVDA / MU / SNDK payloads
+  rewritten to match the cached filings. Provenance quotes lifted
+  verbatim from the 10-Q table rows. Periods, accession numbers and
+  reported_on dates also updated to match the cached files.
+- `workers/ao/integrations/consensus_provider.py` — `_OVERRIDES` re-keyed
+  against the new actuals; estimates read as +1 % to +4 % modest beats
+  across every (ticker, metric) pair.
+- `workers/ao/fixtures/{NVDA,SNDK,MU}/fixture.json` — regenerated.
+
+**SNDK trade-off (heads-up)**
+The original SNDK demo deliberately surfaced a GAAP-vs-non-GAAP EPS
+conflict ($0.79 vs $0.82) that routed the ticker into REVIEW. The cached
+SNDK 10-Q has no non-GAAP / adjusted EPS figure (grepped: zero hits), so
+strict alignment to the filing means SNDK now validates cleanly. The
+REVIEW screen still has SNDK rows because `_seed_review_queue` in
+`workers/ao/db/seed.py` seeds them unconditionally on first-time setup;
+the "freshly-extracted filing auto-routes to REVIEW" path no longer
+fires for SNDK without further work. Two ways to get it back if you
+want it:
+- Edit the cached SNDK 10-Q HTML to insert a non-GAAP adjusted EPS that
+  diverges from the schedule, OR
+- Patch the SNDK fixture to inject a synthetic non-GAAP extraction row
+  (accepts that demo replay then diverges from what real extraction
+  would produce on the unedited filing).
+
+**Verification done**
+- `python -m scripts.export_seed_fixtures` — wrote all three fixtures.
+- `consensus_for()` smoke run: NVDA +1.22 % to +3.22 %, MU +1.22 % to
+  +4.05 %, SNDK +1.82 % to +3.29 %.
+- Fixture replay returns matching $81.6B / $23.86B / $5.95B figures;
+  validation blocks all `passed=True, conflict=False`.
+
+**Files touched**
+- `workers/scripts/export_seed_fixtures.py`
+- `workers/ao/integrations/consensus_provider.py`
+- `workers/ao/fixtures/{NVDA,SNDK,MU}/fixture.json` (regenerated)
+
+**Next step — operating instructions**
+
+For *demo-mode re-runs* (the default):
+1. Fixtures are consistent with the cached 10-Qs. RUN ALL AGENTS
+   replays NVDA / MU / SNDK with the boom-era figures and clean
+   validation across all three. CONS / SURP cells show +1-4 % beats.
+2. NVDA auto-reappears on backend restart via `ensure_demo_anchor`.
+   Add MU / SNDK manually via Add Companies if you want them on the
+   watchlist.
+
+For *real Anthropic re-runs* (`demo_mode=False`, key set):
+3. With the v3 extraction prompt and the cached 10-Qs on disk, real
+   extraction now produces the same $81.6B / $23.86B / $5.95B figures
+   as demo replay — no divergence.
+4. A successful real run still re-writes the per-ticker fixture (per
+   existing demo policy), but the new fixture will effectively equal
+   the seeded one, so no drift.
+
+When cached filings change in the future, you have to update three
+things in lock-step:
+- Payload constants in `workers/scripts/export_seed_fixtures.py`
+- `_OVERRIDES` in `workers/ao/integrations/consensus_provider.py`
+- Re-run `python -m scripts.export_seed_fixtures` from `workers/`
+
+---
+
+## Increment — Help text refreshed for current app surface
+
+**Goal:** the in-app Help page (`web/public/help/Help.html` + `helpdata.js`)
+had drifted behind several increments — archive/restore/permanently-delete,
+per-company data sources + IR URL editor, expanded Settings panels (Demo
+mode, Data sources, Validation thresholds, Reset behavior), the examiner's
+background-tasks rail, and the new Roadmap nav entry. Brought the text in
+line with what ships today, without re-shooting screenshots.
+
+**What changed in `web/public/help/helpdata.js`**
+- §1 Watchlist:
+  - Callout 1 (sidebar) — replaced "seven views" with an explicit list of
+    in-app views + mention of Help and Roadmap at the bottom.
+  - Howto — added a line on hover-tooltips (every chip / header / pill has
+    one now).
+- §2 Company deep-dive:
+  - Callout 4 (Tabs) — added Guidance to the tab list (when Labs flag is on).
+  - Howto — added entries for the per-company Data sources panel, IR URL
+    override, and the ARCHIVE header button.
+  - New `note` — archive lifecycle + NVDA is the demo anchor (archivable
+    but never hard-deletable).
+- §6 Adding companies:
+  - Callout 9 — clarified that archived rows also count as "tracked".
+  - Howto — added the archived panel (RESTORE / PERMANENTLY DELETE) and the
+    DEMO READY chip behavior under Demo mode.
+  - New `note` — explains the NVDA anchor (no PERMANENTLY DELETE button).
+- §8 Settings:
+  - Callout 4 (Providers) — Google "Gemini" was just "Google"; corrected.
+  - Howto — added Demo mode, Data sources, Validation thresholds entries.
+  - `note` rewritten to fully list current panels (Demo mode · Notifications
+    · Data sources · Validation thresholds · Run-all feedback · Labs ·
+    First-time reset).
+- §9 The Document Examiner:
+  - Intro rewritten to describe the NVDA-as-hero pattern + background-tasks
+    rail behavior (other watchlisted tickers' real Finnhub refreshes shown
+    as `refreshing` → `✓ done` pills under the brand line).
+  - Anatomy — added a "Background tasks rail" entry between Per-company
+    progress and Minimise.
+
+**What did not change**
+- Pin coordinates and screenshot images are unchanged. The existing
+  screenshots still show the correct surfaces; only the descriptive copy
+  was stale.
+- No structural changes to `Help.html`. The renderer already handles
+  `note` for non-diagram sections (Help.html:227), so the new notes in §2
+  and §6 just light up.
+
+**Verification done**
+- `cd web && npm run build` — 111 modules, tsc + vite green.
+- `node --check helpdata.js` — syntax ok.
+
+**Files touched**
+- `web/public/help/helpdata.js` — text-only edits across §1, §2, §6, §8, §9.
+
+**Next step**
+Visual QA: `cd web && npm run dev` → open Help → scroll through and confirm
+the new entries render. If any updated callout/howto points at UI not in
+the screenshot (e.g. images predating the ARCHIVE button), capture a fresh
+screenshot into `web/public/help/img/` — file naming + pin coords stay the
+same, only the underlying image changes.
+
+---
+
+## Increment — consensus / surprise unit fix + MU fixture re-seed
+
+**Goal:** the QUARTERLY RESULTS table on the company deep-dive showed wildly
+broken CONS / SURP numbers (Revenue surprise -100%, EPS +997%, raw
+"$13536.87" instead of "$13.54B") because three separate bugs stacked on
+top of one bad extraction. Each fixed in this increment.
+
+**Root causes**
+1. **Unit mismatch in `consensus_provider`.** `_OVERRIDES` stored estimates
+   in raw dollars (`43.30e9`) but `mr.raw_value` is stored in millions
+   (`81615.0`). `(actual − est) / est` then compared 81,615 vs
+   43,300,000,000 → ≈ −100%. Hit every override-matched $-metric.
+2. **Stale hand-coded MU EPS override (`$1.10`).** Authored for an earlier
+   demo period; never refreshed. Actual $12.07 (itself wrong, see #4) ⇒
+   +997% surprise.
+3. **`_fmt_label` treated `raw < 1e6` as raw dollars.** Fallback consensus
+   `13785 × 0.982 = 13,536.87` (millions) rendered as `"$13536.87"` because
+   the formatter didn't know `raw` is in millions for $-keyed metrics.
+4. **`_DEFAULT_SHADE = 0.982` synthesised a fake "+1.8% beat" on every
+   unmapped metric.** Not a consensus — placeholder. Misleading.
+5. **MU fixture corrupted by a real extraction run.** `workers/ao/fixtures/
+   MU/fixture.json` had been overwritten with extraction output that
+   grabbed the wrong period column from the 10-Q (`$23.86B` revenue,
+   `$12.07` EPS — internally consistent with MU's ~1.14B share count, but
+   that's a YTD / multi-period column, not the three-month Q). The
+   "real runs overwrite the fixture" policy made one bad extraction
+   permanently corrupt the demo.
+6. **Extraction prompt was silent on period selection** — no instruction
+   to take only the "Three Months Ended" column on 10-Qs and ignore
+   six-month / YTD columns.
+
+**What changed**
+- `workers/ao/integrations/consensus_provider.py` — rewritten.
+  - `_OVERRIDES` now uses **millions** for $-keyed metrics (matches the
+    extractor). Demo overrides for NVDA / MU / SNDK refreshed against the
+    canonical fixture actuals: surprises now land in the +1 % to +5 %
+    "modest beat" range instead of nonsense.
+  - `_fmt_label` knows `raw < 1000` (in millions) means sub-billion ⇒
+    `"$NNNM"`; ≥ 1000 ⇒ `"$N.NNB"`. No more raw-dollar fallback.
+  - `_DEFAULT_SHADE` removed. `consensus_for` returns `None` for any
+    (ticker, metric) pair not in `_OVERRIDES`. The UI already hides the
+    CONS / SURP cells when consensus is null, so nothing to change
+    frontend-side.
+- `workers/ao/fixtures/MU/fixture.json` — re-generated from the canonical
+  payload in `workers/scripts/export_seed_fixtures.py` (Revenue $9.80B,
+  Net income $2.10B, EPS diluted $1.85, Q3 FY26 ending 2026-05-28).
+- `workers/var/ao.db` (live SQLite) — MU's `is_latest=1` result patched
+  in place to match the fresh fixture. EPS basic / Gross margin metric
+  rows dropped (canonical fixture doesn't carry them). Provenance rows
+  rewritten so the quote / page / source_label match the canonical
+  fixture instead of the bad extraction's table-row scrape.
+  Result row's period / period_end / reported_on / validation block /
+  narrative all reset to the canonical values.
+- `workers/ao/agents/prompts.py` —
+  - `PROMPT_VERSION_EXTRACTION` bumped `v2` → `v3`.
+  - New "PERIOD SELECTION" section at the top of `EXTRACTION_SYSTEM`
+    that explicitly tells the LLM: 10-Q = only "Three Months Ended";
+    reject "Six Months Ended" / "Nine Months Ended" / YTD columns;
+    10-K = only the most recent fiscal-year column; inside MD&A
+    summary tables, pick the leftmost (= current) column. The prompt
+    spells out *why*: YTD figures will be 2-3× larger and "blow EPS,
+    revenue and net income up to nonsense values" — gives the model
+    the failure mode to avoid.
+
+**Verification done**
+- `python -m scripts.export_seed_fixtures` — green; rewrote NVDA/SNDK/MU.
+- Live ASGI smoke test with `flags.consensus=True`:
+  - `GET /api/v1/companies/MU` returns Revenue $9.80B (cons $9.55B,
+    +2.62 %), Net income $2.10B (cons $2.02B, +3.96 %), EPS diluted
+    $1.85 (cons $1.76, +5.11 %). No EPS basic / Gross margin rows.
+    Validation block + narrative populated. Provenance citations all
+    point to the right pages with clean quotes.
+  - `GET /api/v1/companies/NVDA` returns Revenue $81.6B (cons $80.00B,
+    +2.02 %), Net income $58.3B (cons $56.50B, +3.22 %), EPS diluted
+    $2.39 (cons $2.32, +3.02 %), EPS basic $2.40 (cons $2.33, +3.00 %),
+    Gross margin 74.9 % (cons 74.0 %, +1.22 %).
+  - `consensus_for("AAPL", "Revenue", …)` → `None` (no override, no
+    fake fallback).
+
+**Files touched**
+- `workers/ao/integrations/consensus_provider.py`
+- `workers/ao/agents/prompts.py`
+- `workers/ao/fixtures/MU/fixture.json` (regenerated via the export script)
+- `workers/var/ao.db` (one-shot SQL patch on the live demo DB)
+
+**Decisions baked in**
+- Estimates live in millions for $-keyed metrics, raw dollars for EPS,
+  percentage-as-number for margins. The contract is now stated at the
+  top of `consensus_provider.py`.
+- No synthetic consensus: missing (ticker, metric) ⇒ `None` ⇒ CONS / SURP
+  cells stay blank. Better to show nothing than a fake beat.
+- The extractor prompt change is the durable fix; the MU DB / fixture
+  patch is one-shot cleanup for the existing corrupt state.
+
+**Next step — what the user needs to do**
+
+For *demo-mode re-runs* (the default, `flags.demo_mode = True`):
+1. Nothing to do for NVDA / SNDK / MU — fixtures are clean, demo replay
+   will rebuild metrics + provenance from them on RUN ALL.
+2. If you add a new ticker via Add Companies, you have to add a row to
+   `_OVERRIDES` in `consensus_provider.py` (in millions for revenue / net
+   income, raw $ for EPS, pct for margin) for the CONS / SURP cells to
+   render — otherwise they stay blank, which is correct.
+
+For *real Anthropic re-runs* (toggle `demo_mode` off, key in env):
+3. The new prompt (v3) takes effect immediately — the next extraction
+   on MU should pull the three-month column and write `~$9-10B` /
+   `~$2B` / `~$1.85-2.00`. If it still grabs YTD, that's a prompt
+   regression worth filing; investigate `workers/ao/agents/prompts.py`
+   PERIOD SELECTION block.
+4. A successful real run will overwrite `workers/ao/fixtures/MU/
+   fixture.json` (per existing demo policy). If the new extraction looks
+   wrong on inspection, restore the canonical fixture with
+   `python -m scripts.export_seed_fixtures` (regenerates NVDA / SNDK / MU
+   from the script constants).
+5. If the SQLite DB ever ends up in a similar corrupt state again
+   (`raw_value`s look obviously wrong), the cheapest reset is Settings →
+   RESET TO FIRST-TIME STATE — it now leaves NVDA as the demo anchor and
+   reseeds clean.
+
+---
+
+## Increment — Roadmap page (static future-features browser)
+
+**Goal:** give the user a separate, browsable page that lists the future
+feature ideas under discussion, laid out in the style of the existing Help
+page (annotated mockups + numbered pins + callouts + a "how it would work"
+panel per feature). Scoped to three user-selected features.
+
+**Scope (user-chosen from a longer brainstorm)**
+1. **Hot Now badge** — flag companies whose validated fundamentals are
+   trending up while share price has stayed flat over the same window.
+   Surfaces on the Watchlist card.
+2. **Insider conviction** — flag clustered insider buying (≥ 2 distinct
+   officers/directors net-buying in a rolling window) using Finnhub Form-4
+   data that the app already fetches.
+3. **New entrants** — daily monitor that detects new S&P 500 additions
+   (and removals) and surfaces them in Add Companies behind a "NEW IN INDEX"
+   banner with one-click TRACK.
+
+**What changed**
+- `web/public/future/Future.html` — clone of `help/Help.html`. Same inline
+  CSS, same render loop (figure / pins / callouts / howto), same scroll-spy
+  TOC. Retitled "What's next for Agent Orange"; intro band reframed around
+  the *signals layer* concept (validated data → what to notice).
+- `web/public/future/futuredata.js` — sets `window.FUTURE_SECTIONS = [...]`
+  with three entries, identical shape to `HELP_SECTIONS`. Each entry has
+  numbered pins, callouts, a "How it would work" ordered list, and a
+  trailing `note` explaining the rationale.
+- `web/public/future/img/{hot-now,insider-conviction,new-entrants}.png` —
+  placeholder mockups cloned from `help/img/watchlist.jpg` (hot-now,
+  insider-conviction) and `help/img/addcompanies.jpg` (new-entrants).
+  User can swap in bespoke shots without code changes — page works the
+  moment files sit at those names.
+- `web/src/layout/AppShell.tsx` — added one nav entry below `Help`:
+  `{ to: '/future/Future.html', label: 'Roadmap', icon: '✦', external: true }`.
+  Reuses the existing `external: true` plumbing that opens the static
+  page in a new tab.
+
+**Decisions baked in**
+- Static HTML (not a React route) — mirrors the Help-page pattern exactly;
+  decouples roadmap content from SPA build cadence and lets the user (or
+  Claude) iterate on copy without touching TS.
+- Placeholder images on first commit; bespoke mockups are a follow-up the
+  user can drive separately. The page renders coherently against the
+  existing watchlist / add-companies screenshots — pin positions are
+  approximate but readable.
+- No backend, no DB schema changes, no feature flags. Roadmap is read-only
+  marketing copy.
+
+**Verification done**
+- `cd web && npm run build` → 111 modules, tsc + vite both green.
+- `dist/future/{Future.html,futuredata.js,img/*.png}` all present.
+
+**Files touched**
+- `web/public/future/Future.html` (new)
+- `web/public/future/futuredata.js` (new)
+- `web/public/future/img/{hot-now,insider-conviction,new-entrants}.png` (new)
+- `web/src/layout/AppShell.tsx` (one line added to `NAV`)
+
+**Next step**
+Visual QA: `cd web && npm run dev`, click **Roadmap** in the sidebar (new
+sparkle icon below Help). New tab opens to Future.html. Confirm:
+1. Three sections render with numbered pins on the mockup, matching callouts,
+   and an orange "How it would work" panel.
+2. Hovering a pin highlights its callout (and vice versa).
+3. Sidebar TOC on the left scroll-spies as you scroll.
+Swap the three placeholder PNGs in `web/public/future/img/` for bespoke
+mockups when the user wants more accurate visuals.
+
+---
+
+## Increment — explanatory tooltips across watchlist + company page
+
+**Goal:** make the watchlist card and company deep-dive self-explanatory on
+hover. The user can already click the confidence gauge / metric badges for
+detail; tooltips fill the gap for things that have no drill-down (day-change
+arrow, column headers, status chips, portfolio strip totals).
+
+**What changed**
+- `web/src/components/primitives.tsx`
+  - `Price` — split the `▲ x.xx%` chunk into its own `<span>` with a tooltip
+    explaining today's move vs prior close + refresh cadence. Numeric value
+    gets a `Last share price · $N` tooltip.
+  - `ConfidenceGauge` — replaced the static `Financial confidence — click for
+    the breakdown` tooltip with a dynamic string that interpolates the pct +
+    band and a one-line definition (inter-doc agreement / source consistency /
+    insider-news / price-trend).
+  - `StatusChip` — added a `STATUS_TIPS` map (validated / review / watching /
+    error) so the chip tells the user what each status actually means.
+  - `Conf` (HIGH/MED/LOW badge) — added per-level tips and appends `Click for
+    the sources.` only when the badge is interactive.
+- `web/src/screens/Watchlist.tsx`
+  - Portfolio strip cells (PORTFOLIO / COST / UNREALIZED) all have tooltips
+    explaining the math.
+  - Per-card POSITION pill, LAST REPORTED / LATEST period chip, next-window
+    foot note, and validated foot note all have tooltips with the relevant
+    interpolated values.
+  - Per-metric `+x.x% vs est` surprise pill gets a tooltip that quotes the
+    actual + estimate.
+- `web/src/screens/Company.tsx`
+  - New `TAB_TIPS` map covers all six tabs (RESULTS / VALIDATION / GUIDANCE /
+    NEWS / INSIDER / AGENT RUNS). Each `<button className="tab">` gets the
+    matching `title`.
+  - Quarterly Results table — METRIC + CONS + SURP headers all carry full-text
+    tooltips; period headers explain "latest" vs "prior" with the period +
+    ended date. Confidence row label also tipped.
+  - Validation tab — PASSED / NEEDS REVIEW badge, rule chip, corroboration
+    count, conflict pill all have descriptive tooltips.
+  - Header `<div className="co-srcrow">` SOURCES label, each `src-pill`, and
+    `src-mode` chip all carry tooltips.
+  - AI narrative card gets a tooltip explaining it's AI-written and capped at
+    200 tokens.
+  - Per-metric validation row + `mr-prov` count gets a tooltip + the row's
+    onClick is now also surfaced via a title hint.
+- `web/src/components/LogList.tsx` — Activity log columns (timestamp, agent,
+  cost) get short header tooltips.
+
+**Decisions baked in**
+- Pure native `title=` tooltips, not a custom popover component. Keeps the
+  diff tiny, plays nicely with the existing terminal aesthetic, and respects
+  OS accessibility settings out of the box.
+- Confidence tooltip is dynamic: pct + band are interpolated so a 23 % LOW
+  card and an 84 % HIGH card both show their own numbers on hover, not just a
+  generic definition.
+- Status tooltips lift the verbatim semantics from `CONFIDENCE.md` /
+  `components/status.ts` rather than re-inventing copy.
+
+**Verification done**
+- `cd web && npm run build` → 111 modules, tsc + vite both clean.
+
+**Files touched**
+- `web/src/components/primitives.tsx`
+- `web/src/components/LogList.tsx`
+- `web/src/screens/Watchlist.tsx`
+- `web/src/screens/Company.tsx`
+
+**Next step**
+Visual QA in a browser:
+1. `/` → hover the price arrow on a card; expect "Today's move … up/down x.xx%
+   …". Hover the confidence ring; expect a sentence quoting that card's pct +
+   band. Hover the status chip, POSITION pill, portfolio strip cells, and
+   foot notes — each should describe what it represents.
+2. `/company/NVDA` → hover every tab (RESULTS … AGENT RUNS); hover the CONS /
+   SURP / METRIC headers and the period columns. Switch to VALIDATION and
+   hover the PASSED badge, rule chip, and corroboration count.
+
+---
+
 ## Increment — Demo mode (skip Opus, replay cached extractions)
 
 **Goal:** drive the app end-to-end with `$0` Anthropic spend by adding a Settings

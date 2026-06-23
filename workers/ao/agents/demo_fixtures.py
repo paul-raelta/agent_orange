@@ -200,6 +200,7 @@ def to_validation_output(d: dict | None):
         corroborations=int(d.get("corroborations", 0) or 0),
         conflict=bool(d.get("conflict", False)),
         per_metric=per_metric,
+        demo_synthetic=bool(d.get("demo_synthetic", False)),
     )
 
 

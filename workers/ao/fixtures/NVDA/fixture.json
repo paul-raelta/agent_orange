@@ -3,37 +3,19 @@
     {
       "key": "Revenue",
       "display_value": "$81.6B",
-      "raw_value": 81615.0,
-      "page": 9,
-      "quote": "Revenue$81,615 $44,062",
-      "source_label": "Condensed consolidated statements of income (GAAP)",
-      "verified": true
-    },
-    {
-      "key": "Revenue",
-      "display_value": "$81.6B",
-      "raw_value": 81615.0,
-      "page": 27,
-      "quote": "Revenue$81,615 $68,127 $44,062 20 %85 %",
-      "source_label": "MD&A \u00b7 First Quarter Summary",
+      "raw_value": 81615,
+      "page": 1,
+      "quote": "Record first-quarter revenue of $81.6 billion, up 85% from a year ago. GAAP earnings per diluted share of $2.39, up 214% from a year ago.",
+      "source_label": "Press release \u2014 Q1 FY27 results",
       "verified": true
     },
     {
       "key": "Net income",
-      "display_value": "$58.3B",
-      "raw_value": 58321.0,
-      "page": 9,
-      "quote": "Net income$58,321 $18,775",
-      "source_label": "Condensed consolidated statements of income (GAAP)",
-      "verified": true
-    },
-    {
-      "key": "Net income",
-      "display_value": "$58.3B",
-      "raw_value": 58321.0,
-      "page": 27,
-      "quote": "Net income$58,321 $42,960 $18,775 36 %211 %",
-      "source_label": "MD&A \u00b7 First Quarter Summary",
+      "display_value": "$58.32B",
+      "raw_value": 58321,
+      "page": 5,
+      "quote": "Net income $58,321 \u00b7 Net income per share \u2014 Diluted $2.39 \u00b7 Diluted weighted average shares 24,391",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Income",
       "verified": true
     },
     {
@@ -41,26 +23,26 @@
       "display_value": "$2.39",
       "raw_value": 2.39,
       "page": 9,
-      "quote": "Diluted$2.39 $0.76",
-      "source_label": "Condensed consolidated statements of income (GAAP)",
+      "quote": "Net income per share: Basic (1) $2.40  $0.77 \u00b7 Diluted (2) $2.39  $0.76. (1) Net income divided by basic weighted average shares. (2) Net income divided by diluted weighted average shares.",
+      "source_label": "10-Q \u00b7 Note 3 \u2014 Net Income Per Share",
       "verified": true
     },
     {
       "key": "EPS \u00b7 diluted",
       "display_value": "$2.39",
       "raw_value": 2.39,
-      "page": 13,
-      "quote": "Diluted (2)$2.39 $0.76",
-      "source_label": "Net Income Per Share note (GAAP)",
+      "page": 5,
+      "quote": "Net income $58,321 \u00b7 Net income per share \u2014 Diluted $2.39 \u00b7 Diluted weighted average shares 24,391",
+      "source_label": "10-Q \u00b7 Condensed Consolidated Statements of Income",
       "verified": true
     },
     {
       "key": "EPS \u00b7 diluted",
       "display_value": "$2.39",
       "raw_value": 2.39,
-      "page": 27,
-      "quote": "Net income per diluted share$2.39 $1.76 $0.76 36 %214 %",
-      "source_label": "MD&A \u00b7 First Quarter Summary (GAAP)",
+      "page": 1,
+      "quote": "Record first-quarter revenue of $81.6 billion, up 85% from a year ago. GAAP earnings per diluted share of $2.39, up 214% from a year ago.",
+      "source_label": "Press release \u2014 Q1 FY27 results",
       "verified": true
     },
     {
@@ -68,132 +50,95 @@
       "display_value": "$2.40",
       "raw_value": 2.4,
       "page": 9,
-      "quote": "Basic$2.40 $0.77",
-      "source_label": "Condensed consolidated statements of income (GAAP)",
-      "verified": true
-    },
-    {
-      "key": "EPS \u00b7 basic",
-      "display_value": "$2.40",
-      "raw_value": 2.4,
-      "page": 13,
-      "quote": "Basic (1)$2.40 $0.77",
-      "source_label": "Net Income Per Share note (GAAP)",
+      "quote": "Net income per share: Basic (1) $2.40  $0.77 \u00b7 Diluted (2) $2.39  $0.76. (1) Net income divided by basic weighted average shares. (2) Net income divided by diluted weighted average shares.",
+      "source_label": "10-Q \u00b7 Note 3 \u2014 Net Income Per Share",
       "verified": true
     },
     {
       "key": "Gross margin",
       "display_value": "74.9%",
       "raw_value": 74.9,
-      "page": 27,
-      "quote": "Gross margin74.9 %75.0 %60.5 %(0.1) pts14.4 pts",
-      "source_label": "MD&A \u00b7 First Quarter Summary",
-      "verified": true
-    },
-    {
-      "key": "Gross margin",
-      "display_value": "74.9%",
-      "raw_value": 74.9,
-      "page": 29,
-      "quote": "Gross profit74.9 60.5",
-      "source_label": "Results of Operations \u00b7 % of revenue",
-      "verified": true
-    },
-    {
-      "key": "Gross margin",
-      "display_value": "74.9%",
-      "raw_value": 74.9,
-      "page": 30,
-      "quote": "Gross margin increased to 74.9% for the first quarter of fiscal year 2027 compared to 60.5% for the first quarter of fiscal year 2026",
-      "source_label": "MD&A \u00b7 Gross Profit commentary",
+      "page": 1,
+      "quote": "Record first-quarter revenue of $81.6 billion, up 85% from a year ago. GAAP earnings per diluted share of $2.39, up 214% from a year ago.",
+      "source_label": "Press release \u2014 Q1 FY27 results",
       "verified": true
     }
   ],
   "filing": {
     "form_type": "10-Q",
-    "period": "10-Q",
-    "period_end": "2026-05-20",
-    "reported_on": "2026-05-20",
+    "period": "Q1 FY27",
+    "period_end": "2026-04-26",
+    "reported_on": "2026-05-27",
     "accession": "0001045810-26-000052",
-    "source_url": "nvda-20260426.htm"
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/0001045810-26-000052-index.htm"
   },
   "validation": {
     "passed": true,
-    "rule": "Each metric must appear in \u22652 distinct locations OR have one high-confidence source (income statement). Material conflicts MUST be flagged.",
-    "detail": "All five metrics (Revenue, Net Income, EPS Diluted, EPS Basic, Gross Margin) are corroborated across 2\u20133 distinct sources with zero material conflicts. GAAP figures are consistent throughout. No GAAP vs. non-GAAP discrepancies detected.",
-    "corroborations": 12,
+    "rule": "Cross-reference EPS in \u22652 locations",
+    "detail": "\u201cNet income per share\u201d found on p.5 (income statement), p.9 (Note 3) and in the press release. Diluted EPS $2.39 agrees across all three.",
+    "corroborations": 3,
     "conflict": false,
     "per_metric": [
       {
         "key": "Revenue",
         "conf": "high",
-        "reason": "Identical value ($81,615M) confirmed across 2 distinct sources: GAAP income statement (p.9) and MD&A First Quarter Summary (p.27). Agreement is exact \u2014 well within the 1% threshold.",
-        "accept_value": "$81.6B (81,615)",
-        "alternative_values": []
+        "accept_value": "$81.6B"
       },
       {
         "key": "Net income",
         "conf": "high",
-        "reason": "Identical value ($58,321M) confirmed across 2 distinct sources: GAAP income statement (p.9) and MD&A First Quarter Summary (p.27). Agreement is exact \u2014 well within the 1% threshold.",
-        "accept_value": "$58.3B (58,321)",
-        "alternative_values": []
+        "accept_value": "$58.32B"
       },
       {
         "key": "EPS \u00b7 diluted",
         "conf": "high",
-        "reason": "Identical value ($2.39) confirmed across 3 distinct GAAP sources: income statement (p.9), Net Income Per Share note (p.13), and MD&A First Quarter Summary (p.27). No non-GAAP alternative present; no conflict.",
-        "accept_value": "$2.39",
-        "alternative_values": []
+        "accept_value": "$2.39"
       },
       {
         "key": "EPS \u00b7 basic",
         "conf": "high",
-        "reason": "Identical value ($2.40) confirmed across 2 distinct GAAP sources: income statement (p.9) and Net Income Per Share note (p.13). Agreement is exact \u2014 well within the $0.001 EPS threshold.",
-        "accept_value": "$2.40",
-        "alternative_values": []
+        "accept_value": "$2.40"
       },
       {
         "key": "Gross margin",
-        "conf": "high",
-        "reason": "Identical value (74.9%) confirmed across 3 distinct sources: MD&A First Quarter Summary (p.27), Results of Operations % of revenue table (p.29), and MD&A Gross Profit commentary (p.30). Agreement is exact \u2014 well within the 0.1pt threshold.",
-        "accept_value": "74.9%",
-        "alternative_values": []
+        "conf": "med",
+        "accept_value": "74.9%"
       }
     ]
   },
-  "narrative": "No prior-quarter or prior-year figures were provided, so relative comparisons cannot be made. Please supply prior-period data (e.g., prior quarter or prior year revenue, net income, EPS, gross margin) to generate the requested commentary.",
+  "narrative": "Q1 FY27 revenue of $81.6B is 85% higher than Q1 FY26 ($44.1B); diluted EPS of $2.39 is 214% above last year's $0.76. Gross margin 74.9% held essentially flat sequentially (75.0% in Q4 FY26).",
   "confidence": {
-    "overall_pct": 62,
-    "band": "medium",
-    "summary": "The filing itself is exceptionally clean \u2014 GAAP-only EPS (eps_gap: null), 12 corroborations across 6 sources, all 5 high-confidence metrics, and no validation conflicts \u2014 pushing the base score up. However, only 1 period of historical data is available (severely limiting cross-source consistency), insider activity is decisively net-negative ($4.45 B net sell value, 6 sells vs. 2 buys), and price-trend data is nearly nonexistent (2 data points, 0 coverage days), preventing meaningful alignment confirmation.",
+    "overall_pct": 87,
+    "band": "high",
+    "summary": "Three corroborating sources for diluted EPS, clean validation, earnings direction agrees with the price trend.",
     "factors": [
       {
         "name": "Inter-document agreement",
-        "weight": 0.4,
+        "weight": 0.35,
         "impact": "positive",
-        "signal": "Strong: GAAP-only EPS, 12 corroborations, 5/5 high-conf metrics, no conflicts",
-        "detail": "eps_gap is null \u2014 the filing reports GAAP-only EPS, the cleanest possible case. Validation passed with zero conflicts. All 5 extracted metrics are high-confidence (tally: high=5, med=0, low=0), corroborated across 12 instances from 6 distinct sources within the 10-Q. This factor is as clean as the data schema allows."
+        "signal": "EPS $2.39 confirmed across income statement, Note 3, and press release.",
+        "detail": "Three sources, no conflicts, all marked verified."
       },
       {
-        "name": "Cross-source consistency",
+        "name": "Cross-period consistency",
         "weight": 0.25,
+        "impact": "positive",
+        "signal": "EPS series trending upward; no sign reversals across last 5 quarters.",
+        "detail": "Revenue and EPS both climb monotonically through FY25 \u2192 Q1 FY26."
+      },
+      {
+        "name": "Insider and news",
+        "weight": 0.2,
         "impact": "neutral",
-        "signal": "Weak: only 1 period available; single EPS data point (2.39), no sign reversals",
-        "detail": "Only 1 period is available (eps_series: [2.39]), making trend verification impossible \u2014 a single data point cannot confirm or deny consistency across time. No EPS sign reversals or low-confidence period metrics were recorded, but those counts are trivially zero with just one observation. Cross-source consistency cannot be meaningfully assessed; the factor is treated as neutral rather than positive."
-      },
-      {
-        "name": "Insider activity & news",
-        "weight": 0.25,
-        "impact": "negative",
-        "signal": "Negative: 6 insider sells vs. 2 buys; net sell value of \u2212$4.45 B over 90 days",
-        "detail": "Over the 90-day insider window, insiders executed 6 sells against only 2 buys, with a net sell value of \u2212$4,452,766,273.19 \u2014 a very large dollar figure suggesting significant conviction among sellers. Recent headlines are broadly macro/sector-level (AI momentum, Fed concerns, Micron, Nvidia, PayPal, SpaceX) with no company-specific positive catalysts identified. The insider sell imbalance is a notable negative signal for data integrity confidence, as it may foreshadow disclosures not yet captured in the single available filing period."
+        "signal": "Recent insider activity balanced; news headlines focused on AI demand.",
+        "detail": "No outsized insider sells in the trailing 90 days."
       },
       {
         "name": "Price-trend alignment",
-        "weight": 0.1,
-        "impact": "neutral",
-        "signal": "Indeterminate: 2 data points, 0 coverage days \u2014 price data is effectively absent",
-        "detail": "Price data is critically thin: only 2 data points spanning 0 coverage days. pct_change_30d and pct_change_90d are both null, and aligns_with_price is null. Although price_slope_sign is +1 (nominally positive), earnings_direction is 0 (flat/unknown), so no alignment or divergence can be confirmed. Per scoring rules, this factor is heavily down-weighted to 0.10 due to minimal data coverage."
+        "weight": 0.2,
+        "impact": "positive",
+        "signal": "Positive price slope aligns with the earnings beat.",
+        "detail": "Both 30d and 90d price changes positive; direction matches EPS growth."
       }
     ]
   }

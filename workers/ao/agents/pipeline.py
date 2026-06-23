@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import desc, select
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ao.agents import confidence, demo_fixtures, extraction, monitoring, narrative, validation
@@ -227,25 +227,71 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
     eps_gaap_value, eps_non_gaap_value, eps_sign_flip = _eps_gap(by_key)
 
     # --- 5. Persist Result + Metric + Provenance ---------------------
-    result_row = m.Result(
-        id=uuid4().hex, company_id=company.id, filing_id=new_filing.id,
-        period=new_filing.period or "?",
-        period_end=new_filing.period_end or "",
-        reported_on=new_filing.reported_on or _now(),
-        validated_on=_now() if verdict and verdict.passed else None,
-        validation_passed=bool(verdict and verdict.passed),
-        validation_rule=verdict.rule if verdict else "",
-        validation_detail=verdict.detail if verdict else "",
-        validation_corroborations=verdict.corroborations if verdict else 0,
-        validation_conflict=verdict.conflict if verdict else False,
-        eps_gaap_value=eps_gaap_value,
-        eps_non_gaap_value=eps_non_gaap_value,
-        eps_sign_flip=eps_sign_flip,
-        is_latest=True,
-    )
-    session.add(result_row)
+    # Upsert keyed on (company_id, period): the unique constraint
+    # `uq_result_company_period` means a re-run for the same fiscal period
+    # must update the existing row in place rather than insert. Without this,
+    # a second "Run All Agents" click for the same ticker raises an
+    # IntegrityError mid-pipeline and the notify dispatch never fires.
+    period_key = new_filing.period or "?"
+    existing_result = (await session.execute(
+        select(m.Result).where(
+            m.Result.company_id == company.id, m.Result.period == period_key,
+        )
+    )).scalar_one_or_none()
 
-    # Demote any prior latest.
+    if existing_result is not None:
+        result_row = existing_result
+        result_row.filing_id = new_filing.id
+        result_row.period_end = new_filing.period_end or ""
+        result_row.reported_on = new_filing.reported_on or _now()
+        result_row.validated_on = _now() if verdict and verdict.passed else None
+        result_row.validation_passed = bool(verdict and verdict.passed)
+        result_row.validation_rule = verdict.rule if verdict else ""
+        result_row.validation_detail = verdict.detail if verdict else ""
+        result_row.validation_corroborations = verdict.corroborations if verdict else 0
+        result_row.validation_conflict = verdict.conflict if verdict else False
+        result_row.validation_demo_synthetic = bool(
+            verdict and getattr(verdict, "demo_synthetic", False)
+        )
+        result_row.eps_gaap_value = eps_gaap_value
+        result_row.eps_non_gaap_value = eps_non_gaap_value
+        result_row.eps_sign_flip = eps_sign_flip
+        result_row.is_latest = True
+        # Drop the old metrics + their provenance for this result so the
+        # rebuilt set below isn't shadowed by stale rows. Provenance has no
+        # ON DELETE cascade at the DB level, so delete children first.
+        old_metric_ids = (await session.execute(
+            select(m.Metric.id).where(m.Metric.result_id == result_row.id)
+        )).scalars().all()
+        if old_metric_ids:
+            await session.execute(
+                delete(m.Provenance).where(m.Provenance.metric_id.in_(old_metric_ids))
+            )
+            await session.execute(
+                delete(m.Metric).where(m.Metric.id.in_(old_metric_ids))
+            )
+        await session.flush()
+    else:
+        result_row = m.Result(
+            id=uuid4().hex, company_id=company.id, filing_id=new_filing.id,
+            period=period_key,
+            period_end=new_filing.period_end or "",
+            reported_on=new_filing.reported_on or _now(),
+            validated_on=_now() if verdict and verdict.passed else None,
+            validation_passed=bool(verdict and verdict.passed),
+            validation_rule=verdict.rule if verdict else "",
+            validation_detail=verdict.detail if verdict else "",
+            validation_corroborations=verdict.corroborations if verdict else 0,
+            validation_conflict=verdict.conflict if verdict else False,
+            validation_demo_synthetic=bool(verdict and getattr(verdict, "demo_synthetic", False)),
+            eps_gaap_value=eps_gaap_value,
+            eps_non_gaap_value=eps_non_gaap_value,
+            eps_sign_flip=eps_sign_flip,
+            is_latest=True,
+        )
+        session.add(result_row)
+
+    # Demote any prior latest (for sibling periods on this company).
     prior_latest = (await session.execute(
         select(m.Result).where(
             m.Result.company_id == company.id, m.Result.is_latest == True,  # noqa: E712
@@ -271,7 +317,27 @@ async def run_one(session: AsyncSession, user_id: str, ticker: str) -> None:
                 page=loc.page, quote=loc.quote,
             ))
 
-    # Review items for any conflicts.
+    # Review items for any conflicts. On a re-run for the same period, drop
+    # the prior UNRESOLVED items for this result so we don't accumulate
+    # duplicates each click; items the user has already resolved stay put.
+    if existing_result is not None:
+        stale_review_ids = (await session.execute(
+            select(m.ReviewItem.id).where(
+                m.ReviewItem.result_id == result_row.id,
+                m.ReviewItem.resolved_at.is_(None),
+            )
+        )).scalars().all()
+        if stale_review_ids:
+            await session.execute(
+                delete(m.ReviewCandidate).where(
+                    m.ReviewCandidate.review_item_id.in_(stale_review_ids)
+                )
+            )
+            await session.execute(
+                delete(m.ReviewItem).where(m.ReviewItem.id.in_(stale_review_ids))
+            )
+            await session.flush()
+
     if verdict and verdict.conflict:
         for v in verdict.per_metric:
             if v.conf == "low" and v.alternative_values:

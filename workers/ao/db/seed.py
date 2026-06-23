@@ -158,6 +158,7 @@ def _add_result(session, company: m.Company, *, period, period_end, reported_on,
         validation_detail=validation["detail"],
         validation_corroborations=validation["corroborations"],
         validation_conflict=validation.get("conflict", False),
+        validation_demo_synthetic=validation.get("demo_synthetic", False),
         narrative=narrative,
         is_latest=is_latest,
     )

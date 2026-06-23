@@ -28,6 +28,10 @@ export type Validation = {
   detail: string
   corroborations: number
   conflict?: boolean
+  /* Demo-only flag: true when the conflict in this validation block is
+     synthetic (injected for the SNDK GAAP-vs-non-GAAP demo) and not actually
+     present in the underlying filing. UI surfaces a small notice. */
+  demoSynthetic?: boolean
 }
 
 /* Overall LLM financial-confidence score (company-level). `pct` (0-100) is the

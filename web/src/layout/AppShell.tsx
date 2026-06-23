@@ -50,6 +50,7 @@ const NAV: NavItem[] = [
   // annotated screenshots). NavLink would treat it as a SPA route and miss the
   // file; render as a plain <a> with target=_blank so the user keeps app state.
   { to: '/help/Help.html', label: 'Help', icon: '?', external: true },
+  { to: '/future/Future.html', label: 'Roadmap', icon: '✦', external: true },
 ]
 
 const FEEDBACK_KEY = 'ao-run-feedback'

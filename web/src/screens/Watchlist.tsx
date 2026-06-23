@@ -78,15 +78,24 @@ export function Watchlist() {
 
       {totals && (
         <div className="pf-strip">
-          <div className="pf-cell">
+          <div
+            className="pf-cell"
+            title="Current market value of every watchlisted position (shares × last price), summed across tickers."
+          >
             <span className="lbl">PORTFOLIO</span>
             <span className="pf-val"><AnimatedMoney value={totals.totalValue} /></span>
           </div>
-          <div className="pf-cell">
+          <div
+            className="pf-cell"
+            title="Total cost basis you entered for each position (shares × cost / share), summed across tickers."
+          >
             <span className="lbl">COST</span>
             <span className="pf-val pf-val-dim"><AnimatedMoney value={totals.totalCost} /></span>
           </div>
-          <div className="pf-cell">
+          <div
+            className="pf-cell"
+            title="Unrealized P&L — current value minus cost basis. Green = gain, red = loss. Excludes dividends and fees."
+          >
             <span className="lbl">UNREALIZED</span>
             <span
               className={
@@ -229,7 +238,10 @@ function CompanyCard({
       )}
 
       {!awaitingAgents && c.portfolio.shares > 0 && (
-        <div className="wl-position">
+        <div
+          className="wl-position"
+          title={`Your position in ${c.ticker} — ${c.portfolio.shares} shares × $${c.price.toFixed(2)}. Edit shares + cost basis on the company page.`}
+        >
           <span className="lbl">POSITION</span>
           <span className="wl-position-val">{fmtMoney(c.portfolio.value)}</span>
           <span
@@ -257,7 +269,10 @@ function CompanyCard({
         </div>
       ) : supported ? (
         <>
-          <div className="wl-period">
+          <div
+            className="wl-period"
+            title={`${c.status === 'watching' ? 'Last reported quarter on file' : 'Latest extracted quarter'} — ${L.period}, fiscal period ended ${L.periodEnd}.`}
+          >
             <span className="wl-period-lab">
               {c.status === 'watching' ? 'LAST REPORTED' : 'LATEST'}
             </span>
@@ -278,7 +293,10 @@ function CompanyCard({
                   </div>
                   <div className="wl-metric-val">{m.value}</div>
                   {cs ? (
-                    <div className={'wl-metric-surp ' + surpClass}>
+                    <div
+                      className={'wl-metric-surp ' + surpClass}
+                      title={`${m.key} surprise — actual ${m.value} vs ${cs.estimateLabel} consensus. Positive = beat, negative = miss.`}
+                    >
                       {cs.surprisePct >= 0 ? '+' : ''}
                       {cs.surprisePct.toFixed(1)}% vs est
                     </div>
@@ -304,12 +322,18 @@ function CompanyCard({
                 review →
               </button>
             ) : c.status === 'watching' ? (
-              <span className="wl-foot-note">
+              <span
+                className="wl-foot-note"
+                title={`Predicted window for the next 10-Q / 10-K — ${c.nextWindow.from} to ${c.nextWindow.to}. Derived from this company's historical filing cadence.`}
+              >
                 <span className="chip-dot pulse" style={{ background: 'var(--amber)' }} />{' '}
                 {c.nextWindow.label} · {c.nextWindow.from}–{c.nextWindow.to}
               </span>
             ) : (
-              <span className="wl-foot-note ok">
+              <span
+                className="wl-foot-note ok"
+                title={`Latest filing was extracted and confirmed against ${L.validation.corroborations} additional source${L.validation.corroborations === 1 ? '' : 's'} on ${L.validatedOn}.`}
+              >
                 ✓ {L.validation.corroborations}× corroborated · validated {L.validatedOn}
               </span>
             )}

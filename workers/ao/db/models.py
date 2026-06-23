@@ -149,6 +149,7 @@ class Result(Base):
     validation_detail: Mapped[str] = mapped_column(Text, default="")
     validation_corroborations: Mapped[int] = mapped_column(Integer, default=0)
     validation_conflict: Mapped[bool] = mapped_column(Boolean, default=False)
+    validation_demo_synthetic: Mapped[bool] = mapped_column(Boolean, default=False)
 
     eps_gaap_value: Mapped[float | None] = mapped_column(Float, nullable=True)
     eps_non_gaap_value: Mapped[float | None] = mapped_column(Float, nullable=True)

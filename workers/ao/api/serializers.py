@@ -109,6 +109,7 @@ async def serialize_company(
             detail=latest_row.validation_detail,
             corroborations=latest_row.validation_corroborations,
             conflict=True if latest_row.validation_conflict else None,
+            demoSynthetic=bool(getattr(latest_row, "validation_demo_synthetic", False)),
         )
 
         metric_rows = (await session.execute(

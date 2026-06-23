@@ -85,6 +85,8 @@ _COLUMN_MIGRATIONS: list[tuple[str, str, dict[str, str]]] = [
      {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
     ("feature_flags", "demo_mode",
      {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
+    ("results", "validation_demo_synthetic",
+     {"sqlite": "INTEGER DEFAULT 0", "postgresql": "BOOLEAN DEFAULT FALSE"}),
 ]
 
 
