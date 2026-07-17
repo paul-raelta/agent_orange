@@ -285,6 +285,39 @@ Index drift alerts, options sentiment indicator, and fixed-income/bond support �
 requirements but the lowest value-per-effort in the docx, and bonds in particular need a
 data-source decision before any build.
 
+### Timeline
+
+Assumptions: a two-person team with split roles — one developer owning all backend and
+implementation work (heavily AI-leveraged), and one person owning UAT, QA testing, and
+requirements management (changes, clarifications, client liaison, demo scripting). AI leverage
+compresses scaffolding, CRUD, and UI build time substantially; it compresses integration
+debugging, data-quality edge cases, and acceptance testing far less — the estimates below
+weight the latter.
+
+The split-role model has two timeline effects that partly cancel out. Implementation is
+serial (one person builds backend *and* UI), which lengthens each phase versus two parallel
+developers. But the developer never loses days to test execution or requirements churn, and
+the tester works concurrently — writing test plans during the build, running UAT on each
+feature as it lands, and running final acceptance on phase N while the developer starts
+phase N+1. Net effect: roughly 20% longer than a two-developer estimate, not double.
+
+| Phase | Elapsed time | Main effort drivers (developer, serial) |
+|---|---|---|
+| 1 — Greenfield foundation + Daily Metrics | **4 weeks** | Schema design 2–3d; module transplants 2d; Koyfin integration + field verification 3–4d; ratio functions + tests 2–3d; watchlist/deep-dive UI percent-first 4–5d. Tester in parallel: test plans, ratio-math verification against Koyfin's own screens, demo script. |
+| 2 — Quarterly engine I (P&L) | **4–4.5 weeks** | XBRL ingestion + 8-quarter backfill + normalization (fiscal calendars, amendments, units — the fiddly part) 5d; derived P&L metrics + trends 3d; LLM segment extraction + provenance rework 4–5d; trend UI 3–4d. Tester in parallel: cross-check extracted figures against the actual filings across odd fiscal years — the highest-value QA in the whole plan. |
+| 3 — Quarterly engine II (BS / CF / capital allocation) | **3 weeks** | XBRL pattern established by now; ROIC/ROE + capital allocation functions 3–4d; debt-maturity LLM pass 3–4d; UI sections 3–4d. |
+| 4 — Narrative & external factors | **4 weeks** | Transcript sourcing + MD&A/tone diffing 5d; KPI extraction 3–4d; macro tracker 2–3d; news/comparables 3–4d. **Client-dependency risk:** transcript-provider decision and advisor-supplied analyst research can stall this phase — the requirements owner should secure both during Phase 3. |
+| 5 — Alerting, hardening, handover | **2.5–3 weeks** | 10% trigger + alert center 3–4d; weekly digest 2d; auth + deployed instance + data-flow sign-off doc 4–5d. Tester: end-to-end acceptance pass over the whole product, alert-trigger verification. |
+| **Core total (Phases 1–5)** | **~18–19 weeks elapsed; ~21 with contingency** | Add ~15% contingency for provider surprises and filing edge cases → **call it 5 months** to a handover-ready product, with a client demo roughly every 3–4 weeks. |
+| 6 — Stretch (optional) | +3–4 weeks | Index drift ~1w; options sentiment ~2w; bonds unestimated until the data-source decision is made. |
+
+Sequencing notes: phases are serial for the developer (each builds on the previous data
+layer). The overlap that keeps the total near 18 weeks is the tester's: final acceptance and
+regression on phase N run while the developer is already into phase N+1, with bug-fix
+interleave. The requirements role also absorbs mid-build requirement changes — triaging them
+into the current phase or the backlog — so scope churn moves the plan visibly instead of
+silently eating development days.
+
 ### Questions to put to the client before Phase 1
 
 1. Confidentiality: is sending tickers to data providers and filings to Anthropic acceptable
