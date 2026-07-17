@@ -23,8 +23,11 @@ and should be removed from the client-facing product. Mobile work and demo-mode 
 also not needed.
 
 `project1.md` is a ~90% faithful distillation of the docx. Its main defects: it over-interprets
-the confidentiality requirement into an impossible "no exposure to external systems" rule, and
-it omits the docx's most important framing sentence (the anti-goal about short-term noise).
+the confidentiality requirement into a "no exposure to external systems" rule (**since
+resolved** — the client has confirmed that sending selected tickers to Koyfin and other
+providers is expected and acceptable; confidentiality means restricting access to the tool and
+the watchlist, not avoiding third-party APIs), and it omits the docx's most important framing
+sentence (the anti-goal about short-term noise).
 
 **The build will start from a fresh repository** rather than evolving the POC. This is the
 right call: the POC's data model is shaped around a filings-validation pipeline with five
@@ -66,7 +69,7 @@ a client conversation, not an engineering problem.
 | Themes / advisor lists (defence, regional banks, SaaS…) | 0% | No categorization concept. |
 | Potential vs Selected investment distinction | 0% | One flat watchlist; no "evaluating" vs "invested" lifecycle. |
 | Koyfin integration | 0% | Finnhub used instead. Koyfin (paid account confirmed) becomes the primary price/fundamentals source in the rebuild. |
-| Confidentiality / IP | Partial | Single-user local app, so incidental. Tickers and filing content are sent to Finnhub and Anthropic — see clarification flag under section C. |
+| Confidentiality / IP | Partial | Single-user local app, so incidental. Confidentiality means restricted access to the tool and watchlist — third-party API calls (Koyfin, Anthropic, etc.) are accepted by the client (see section C). Auth is still needed before a deployed instance. |
 | Desktop-first, weekly deliberate use | Yes | Matches by default. |
 
 ---
@@ -117,12 +120,13 @@ not expand it further until analytical breadth catches up.
 daily/quarterly/external taxonomy, the data-sources table, and the open questions on
 index-drift alerts are genuine improvements). Issues found:
 
-1. **Over-interpretation on IP.** project1.md says *"No exposure of selected investments to
-   external systems."* The docx actually says the client wants confidentiality on selections
-   and to limit distribution of the *tool* as IP. Taken literally, project1.md's version
-   prohibits sending tickers to Koyfin, Finnhub, or Anthropic — which makes the product
-   impossible. Needs a client conversation; soften to "restricted access; watchlist not shared
-   with humans; third-party API calls limited to what is technically necessary."
+1. **Over-interpretation on IP — resolved.** project1.md says *"No exposure of selected
+   investments to external systems."* The docx actually says the client wants confidentiality
+   on selections and to limit distribution of the *tool* as IP — and the client has since
+   confirmed that sending selected tickers to Koyfin and other providers is expected and
+   acceptable. This is therefore **not a protection the product needs**. project1.md should be
+   corrected to: restricted access to the tool; watchlist not shared with humans; third-party
+   API calls as technically necessary.
 2. **The anti-goal is missing.** The docx's most important framing sentence — long-term thesis
    strength, *not* EPS beats, guidance wiggles, or market reactions — appears nowhere in
    project1.md. It kills two existing POC features and should shape every screen. Add it as an
@@ -275,8 +279,8 @@ applies mostly to the LLM-extracted subset.
   Twilio SMS channel; in-app alert center with acknowledge/suppress (answers project1.md's
   open questions).
 - Weekly review digest; portfolio-view polish for the slow, deliberate weekly session.
-- Confidentiality hardening: auth, access restriction, documented data-flow to third parties
-  for the client's sign-off.
+- Access hardening: auth and access restriction on the deployed instance (third-party data
+  flows are accepted by the client — see section C).
 - Deployed instance the client can log into between sessions.
 
 ### Phase 6 — Stretch (only if client re-prioritizes)
@@ -307,7 +311,7 @@ phase N+1. Net effect: roughly 20% longer than a two-developer estimate, not dou
 | 2 — Quarterly engine I (P&L) | **4–4.5 weeks** | XBRL ingestion + 8-quarter backfill + normalization (fiscal calendars, amendments, units — the fiddly part) 5d; derived P&L metrics + trends 3d; LLM segment extraction + provenance rework 4–5d; trend UI 3–4d. Tester in parallel: cross-check extracted figures against the actual filings across odd fiscal years — the highest-value QA in the whole plan. |
 | 3 — Quarterly engine II (BS / CF / capital allocation) | **3 weeks** | XBRL pattern established by now; ROIC/ROE + capital allocation functions 3–4d; debt-maturity LLM pass 3–4d; UI sections 3–4d. |
 | 4 — Narrative & external factors | **4 weeks** | Transcript sourcing + MD&A/tone diffing 5d; KPI extraction 3–4d; macro tracker 2–3d; news/comparables 3–4d. **Client-dependency risk:** transcript-provider decision and advisor-supplied analyst research can stall this phase — the requirements owner should secure both during Phase 3. |
-| 5 — Alerting, hardening, handover | **2.5–3 weeks** | 10% trigger + alert center 3–4d; weekly digest 2d; auth + deployed instance + data-flow sign-off doc 4–5d. Tester: end-to-end acceptance pass over the whole product, alert-trigger verification. |
+| 5 — Alerting, hardening, handover | **2.5–3 weeks** | 10% trigger + alert center 3–4d; weekly digest 2d; auth + deployed instance 4–5d. Tester: end-to-end acceptance pass over the whole product, alert-trigger verification. |
 | **Core total (Phases 1–5)** | **~18–19 weeks elapsed; ~21 with contingency** | Add ~15% contingency for provider surprises and filing edge cases → **call it 5 months** to a handover-ready product, with a client demo roughly every 3–4 weeks. |
 | 6 — Stretch (optional) | +3–4 weeks | Index drift ~1w; options sentiment ~2w; bonds unestimated until the data-source decision is made. |
 
@@ -318,13 +322,35 @@ interleave. The requirements role also absorbs mid-build requirement changes —
 into the current phase or the backlog — so scope churn moves the plan visibly instead of
 silently eating development days.
 
+### Client-facing summary (presentation version)
+
+The same plan and numbers as above, stripped of technical detail for presenting to the client.
+
+| Phase | What you get | Duration |
+|---|---|---|
+| **1. Daily Metrics dashboard** | Your watchlist live: add real tickers, see daily valuation ratios (P/E, PEG, PEGY) for each company and vs. the benchmark index, colour-coded and percent-first. | 4 weeks |
+| **2. Quarterly review — profit & loss** | Automated pull of quarterly filings with 2+ years of history. Revenue growth, margin trends, EPS trends, segment breakdowns — every figure traceable back to the source filing. | 4–4.5 weeks |
+| **3. Quarterly review — balance sheet & cash** | Cash and debt trends, free cash flow, ROIC/ROE, capital allocation (dividends, buybacks, acquisitions), share dilution, insider activity. Completes the full 10-Q review. | 3 weeks |
+| **4. Narrative & market context** | Management tone analysis quarter over quarter, industry KPIs, macro tracker (S&P, VIX, rates), relevance-tagged news, and competitor comparisons per holding. | 4 weeks |
+| **5. Alerts & go-live** | 10% move alerts via SMS, in-app alert centre, weekly review digest, secure login, and a deployed system you can use independently. | 2.5–3 weeks |
+| **Core total** | Handover-ready product, with a live demo roughly every 3–4 weeks | **~18–19 weeks (~5 months with contingency)** |
+| **6. Optional extras** | Index drift alerts, options sentiment, bond support — only if re-prioritised. | +3–4 weeks |
+
+Framing points to present alongside the table:
+
+- Every phase ends in a live demo on real tickers, each mapping to a section of the client's
+  own requirements document — progress stays visible and legible throughout.
+- The 5-month figure already includes ~15% contingency; the raw estimate is 18–19 weeks.
+- Team assumption behind the numbers: one developer plus one person on UAT, requirements, and
+  client liaison.
+- One dependency to flag early: Phase 4 needs the transcript-provider decision and
+  advisor-supplied analyst research secured during Phase 3, or it can stall.
+
 ### Questions to put to the client before Phase 1
 
-1. Confidentiality: is sending tickers to data providers and filings to Anthropic acceptable
-   (it is technically required)?
-2. Bonds: which fixed-income instruments, and how urgent? (Suggest deferring.)
-3. Transcripts: paid transcript provider vs IR-page scraping?
-4. Confirm that beat/miss vs analyst consensus should be excluded entirely (their document
+1. Bonds: which fixed-income instruments, and how urgent? (Suggest deferring.)
+2. Transcripts: paid transcript provider vs IR-page scraping?
+3. Confirm that beat/miss vs analyst consensus should be excluded entirely (their document
    implies yes).
 
 ---
