@@ -26,14 +26,22 @@ also not needed.
 the confidentiality requirement into an impossible "no exposure to external systems" rule, and
 it omits the docx's most important framing sentence (the anti-goal about short-term noise).
 
+**The build will start from a fresh repository** rather than evolving the POC. This is the
+right call: the POC's data model is shaped around a filings-validation pipeline with five
+fixed metrics, while the product needs a general time-series metrics store — retrofitting is
+more work than starting clean, and a fresh repo sheds the contradicting features, mobile work,
+demo fixtures, and documentation sprawl for free. The caveat: a set of proven, self-contained
+modules (EDGAR client, CIK resolver, notification dispatch, the extraction technique) should
+be transplanted, not rewritten. See the carry-over inventory in section D.
+
 The recommended path is a six-phase build, each ending in a developer-driven demo on real
 tickers that maps to a section of the client's own document. A key technical decision shapes
 the middle phases: most standardized line items the client wants are available
 **deterministically and free from SEC XBRL companyfacts data** — no LLM needed — which
 repositions the existing Opus pipeline to what genuinely needs AI (segments, organic vs
-acquisition, covenants, debt maturities, MD&A tone, KPIs). The two genuine risks are data
-sourcing (Koyfin has no public API) and covenant/transcript availability — both client
-conversations, not engineering problems.
+acquisition, covenants, debt maturities, MD&A tone, KPIs). Koyfin access is resolved (paid
+account), leaving covenant/transcript data availability as the main open sourcing question —
+a client conversation, not an engineering problem.
 
 ---
 
@@ -57,7 +65,7 @@ conversations, not engineering problems.
 | Add company (name + ticker), US-only | ~70% | S&P 500 browser + CIK resolution works for stocks. No bonds. No free-text entry outside the seeded universe of 162. |
 | Themes / advisor lists (defence, regional banks, SaaS…) | 0% | No categorization concept. |
 | Potential vs Selected investment distinction | 0% | One flat watchlist; no "evaluating" vs "invested" lifecycle. |
-| Koyfin integration | 0% | Finnhub used instead (functionally a substitute; see risk note in the plan). |
+| Koyfin integration | 0% | Finnhub used instead. Koyfin (paid account confirmed) becomes the primary price/fundamentals source in the rebuild. |
 | Confidentiality / IP | Partial | Single-user local app, so incidental. Tickers and filing content are sent to Finnhub and Anthropic — see clarification flag under section C. |
 | Desktop-first, weekly deliberate use | Yes | Matches by default. |
 
@@ -129,6 +137,66 @@ index-drift alerts are genuine improvements). Issues found:
 
 ---
 
+## D. Fresh start: decision and carry-over inventory
+
+**Decision: start a fresh repository. Greenfield the data model and UI; transplant proven
+modules as code and proven techniques as patterns.**
+
+Why a fresh start is right here:
+
+- **The data model doesn't fit.** The POC schema centers on filings → results → five fixed
+  metrics with per-filing validation. The product needs a general time-series store: many
+  metrics per security per period (daily and quarterly series), benchmark series, derived
+  ratios computed in code, plus a security lifecycle (Potential vs Selected) and themes.
+  Retrofitting that onto the existing models — migrating every table, serializer, and screen —
+  is more work than designing it clean.
+- **Dead weight drops for free.** Consensus/guidance LABS features, mobile responsiveness,
+  demo-mode fixtures, and a large documentation/handoff sprawl simply don't get ported —
+  no archaeology, no risk of half-removed code paths.
+- **Clean IP story.** A fresh history with no fixture data or exploratory commits supports the
+  client's confidentiality/IP expectations.
+
+The caveat: the POC de-risked real engineering, and rewriting it would be waste. Port it as
+libraries into the new repo.
+
+### Carry over (port the code)
+
+| Asset | Location in POC | Why |
+|---|---|---|
+| EDGAR client | `workers/ao/integrations/edgar_client.py` | Filing detection + rate-limited download; proven against SEC fair-use limits. |
+| CIK resolver | `workers/ao/integrations/cik_resolver.py` | Ticker → CIK with 24h cache; needed on day one of Add Companies. |
+| Notification dispatch | `workers/ao/notify/` | Twilio SMS + Gmail SMTP + per-event opt-in, graceful degradation. Phase 5 rewires the triggers; the channels are done. |
+| SSRF-guarded fetcher | `safe_fetch` middle-path | Small, security-sensitive, already hardened. |
+| S&P 500 universe seed | `/universe` data | Saves re-sourcing the roster. |
+
+### Carry over (port the technique, rework the target)
+
+| Asset | Why |
+|---|---|
+| Opus extraction with tool use, page-aware citations, quote verification | The provenance approach is the POC's core IP. Re-aim it at segments, organic-vs-acquisition, covenants, debt maturities, MD&A — not at line items XBRL provides. |
+| Validation thresholds + review-queue design | The reconcile-or-escalate pattern (and its tolerance bands) applies to every LLM-extracted figure; rebuild the queue on the new schema. |
+| APScheduler dual-mode pattern (in-process dev / external prod) | Proven deploy-portable design; trivially recreated. |
+| Wire-contract discipline (`types.ts` + serializer gate) | Keep the pattern; the contract itself is new. |
+| Design tokens / terminal aesthetic / provenance drawer | Carry the design language; rebuild screens percent-first around the new metrics model. |
+
+### Leave behind
+
+DB schema and serializers, demo mode + fixtures, consensus and guidance features, mobile CSS
+and breakpoints, portfolio P&L strip (rebuilt percent-first), help assistant, cost/budget
+dashboards and model-routing UI (rebuild later if wanted), Finnhub as primary source (Koyfin
+takes over; optionally keep Finnhub for news and Form 4 insider feeds if Koyfin doesn't cover
+them), and all handoff scripts / PROGRESS.md-style documentation.
+
+### Does this change the phases?
+
+Scope, sequencing, and demo goals are unchanged. Two adjustments: Phase 1 absorbs the
+greenfield scaffolding (new repo, requirements-shaped schema, module transplants) — its
+"remove the contradicting features" work becomes simply *don't port them*. And with the Koyfin
+paid account confirmed, the data-provider spike shrinks from a risk item to a verification
+task. Later phases should run faster with no legacy constraints.
+
+---
+
 ## Recommended build: phased plan
 
 Each phase ends in a developer-driven interactive demo on **real tickers** (no fixtures), and
@@ -143,18 +211,21 @@ schedules, MD&A tone, and KPIs. Hybrid XBRL-first + LLM-for-the-rest is cheaper,
 reliable, and keeps deterministic math in code. The existing provenance/validation layer then
 applies mostly to the LLM-extracted subset.
 
-### Phase 1 — Realignment + Daily Metrics dashboard (the daily-use win)
+### Phase 1 — Greenfield foundation + Daily Metrics dashboard (the daily-use win)
 
-- Remove/flag-off consensus and guidance; strip demo-mode from the client path.
-- Add investment lifecycle (**Potential vs Selected**) and **themes/lists** (defence, regional
-  banks, etc.) — cheap schema + UI work, big requirements coverage.
-- **Data provider spike (do first — it is the phase's main risk):** Koyfin has no public API;
-  "give you my login" implies scraping, which is fragile and likely against ToS. Verify what
-  Koyfin actually offers the client's account tier; line up a fallback fundamentals provider
-  (FMP, Polygon, or Finnhub fundamentals) and present the trade-off to the client.
-- Compute **P/E, PEG, PEGY** per company, the same ratios for the benchmark index (SPY/QQQ
-  proxies or index-level data), and the **diff**.
-- Reformat: percent-first everywhere, green-up/red-down, dollar toggle.
+- New repository scaffold; schema designed around the requirements from day one: securities
+  with a **Potential vs Selected** lifecycle, **themes/lists** (defence, regional banks, etc.),
+  a time-series metrics store (daily and quarterly series), and benchmark series.
+- Transplant the carry-over modules (section D): EDGAR client, CIK resolver, notification
+  dispatch, safe_fetch, universe seed. Consensus/guidance, demo mode, and mobile work are
+  simply not ported.
+- **Koyfin integration** (paid account — access confirmed): wire it up as the primary price
+  and fundamentals source. Early in the phase, verify field coverage for the ratio inputs —
+  growth estimates for PEG, dividend yield for PEGY, and index-level ratios — and note any
+  gaps to fill from a secondary source.
+- Compute **P/E, PEG, PEGY** per company, the same ratios for the benchmark index, and the
+  **diff** — as pure functions in code over the stored series.
+- Formatting from the start: percent-first everywhere, green-up/red-down, dollar toggle.
 - **Demo:** client watches their real tickers added, then sees the daily valuation dashboard
   vs benchmark — the exact "Daily Metrics" section of their document, live.
 
@@ -216,21 +287,22 @@ data-source decision before any build.
 
 ### Questions to put to the client before Phase 1
 
-1. Koyfin: what API/export access does their subscription actually include? Acceptable to use
-   an alternative feed if not?
-2. Confidentiality: is sending tickers to data providers and filings to Anthropic acceptable
+1. Confidentiality: is sending tickers to data providers and filings to Anthropic acceptable
    (it is technically required)?
-3. Bonds: which fixed-income instruments, and how urgent? (Suggest deferring.)
-4. Transcripts: paid transcript provider vs IR-page scraping?
-5. Confirm that beat/miss vs analyst consensus should be excluded entirely (their document
+2. Bonds: which fixed-income instruments, and how urgent? (Suggest deferring.)
+3. Transcripts: paid transcript provider vs IR-page scraping?
+4. Confirm that beat/miss vs analyst consensus should be excluded entirely (their document
    implies yes).
 
 ---
 
 ## Strategic summary
 
-The POC's ingestion-and-trust platform survives almost entirely; the product work ahead is a
-metrics engine on top of it, and roughly 70% of those metrics can be computed deterministically
-from free XBRL data — meaning the phases above are more about breadth of well-understood work
-than technical risk. The two genuine risks are the Koyfin question and covenant/transcript
-data availability, both of which are client conversations, not engineering problems.
+The rebuild starts from a fresh repository, but the POC's de-risked engineering survives as
+transplanted modules and proven techniques (section D) — what gets rebuilt is the data model
+and UI, which were shaped by the wrong requirements. The product work ahead is a metrics
+engine, and roughly 70% of those metrics can be computed deterministically from free XBRL data
+plus the Koyfin feed (paid account confirmed) — meaning the phases above are more about
+breadth of well-understood work than technical risk. The main open sourcing question is
+covenant/transcript data availability, which is a client conversation, not an engineering
+problem.
